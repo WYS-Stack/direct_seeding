@@ -1,0 +1,1 @@
+pyinstaller --onefile --windowed --icon=app.icns wxpython_continuous_mouse_click.py

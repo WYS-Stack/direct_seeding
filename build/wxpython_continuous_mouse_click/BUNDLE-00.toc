@@ -1,0 +1,3 @@
+([('wxpython_continuous_mouse_click',
+   '/Users/wanghan/Desktop/code/direct_seeding/dist/wxpython_continuous_mouse_click',
+   'EXECUTABLE')],)
