@@ -11,6 +11,12 @@ from ppadb.client import Client as AdbClient
 
 # 自定义窗口类MyFrame
 class MyFrame(wx.Frame):
+    id_open = wx.NewIdRef()
+    id_save = wx.NewIdRef()
+    id_quit = wx.NewIdRef()
+
+    id_help = wx.NewIdRef()
+    id_about = wx.NewIdRef()
     def __init__(self, parent, title):
         super(MyFrame, self).__init__(parent, title=title, size=(500, 500), pos=(600, 200))
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -40,6 +46,100 @@ class MyFrame(wx.Frame):
 
         # 主控制面板
         self.control_panel_main()
+
+        self._create_menubar()  # 菜单栏
+        self._create_toolbar()  # 工具栏
+        self._create_statusbar()  # 状态栏
+
+    def _create_menubar(self):
+        """创建菜单栏"""
+
+        self.mb = wx.MenuBar()
+
+        # 文件菜单
+        m = wx.Menu()
+        m.Append(self.id_open, '打开文件')
+        m.Append(self.id_save, '保存文件')
+        m.AppendSeparator()
+        m.Append(self.id_quit, '退出系统')
+        self.mb.Append(m, '文件')
+
+        self.Bind(wx.EVT_MENU, self.on_open, id=self.id_open)
+        self.Bind(wx.EVT_MENU, self.on_save, id=self.id_save)
+        self.Bind(wx.EVT_MENU, self.on_quit, id=self.id_quit)
+
+        # 帮助菜单
+        m = wx.Menu()
+        m.Append(self.id_help, '帮助主题')
+        m.Append(self.id_about, '关于...')
+        self.mb.Append(m, '帮助')
+
+        self.Bind(wx.EVT_MENU, self.on_help, id=self.id_help)
+        self.Bind(wx.EVT_MENU, self.on_about, id=self.id_about)
+
+        self.SetMenuBar(self.mb)
+
+    def _create_toolbar(self):
+        """创建工具栏"""
+
+        self.toolbar = self.CreateToolBar(style=wx.TB_HORZ_TEXT)  # 创建工具栏
+        self.toolbar.SetToolBitmapSize((16, 16))  # 设置工具按钮的位图大小
+
+        self.toolbar.AddTool(wx.ID_NEW, "New", wx.ArtProvider.GetBitmap(wx.ART_NEW))  # 添加工具按钮
+        self.toolbar.AddTool(wx.ID_OPEN, "Open", wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN))
+        self.toolbar.AddTool(wx.ID_SAVE, "Save", wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE))
+
+        self.toolbar.Realize()  # 实现工具栏
+
+        self.Bind(wx.EVT_TOOL, self.on_tool_click)  # 绑定工具按钮点击事件
+
+    def on_tool_click(self, event):
+        tool_id = event.GetId()
+
+        if tool_id == wx.ID_NEW:
+            print("New tool clicked")
+        elif tool_id == wx.ID_OPEN:
+            print("Open tool clicked")
+        elif tool_id == wx.ID_SAVE:
+            print("Save tool clicked")
+
+    def _create_statusbar(self):
+        """创建状态栏"""
+
+        self.sb = self.CreateStatusBar()
+        self.sb.SetFieldsCount(3)
+        self.sb.SetStatusWidths([-2, -1, -1])
+        self.sb.SetStatusStyles([wx.SB_RAISED, wx.SB_RAISED, wx.SB_RAISED])
+
+        self.sb.SetStatusText('状态信息0', 0)
+        self.sb.SetStatusText('', 1)
+        self.sb.SetStatusText('状态信息2', 2)
+
+    def on_open(self, evt):
+        """打开文件"""
+
+        self.sb.SetStatusText(u'打开文件', 1)
+
+    def on_save(self, evt):
+        """保存文件"""
+
+        self.sb.SetStatusText(u'保存文件', 1)
+
+    def on_quit(self, evt):
+        """退出系统"""
+
+        self.sb.SetStatusText(u'退出系统', 1)
+        self.Destroy()
+
+    def on_help(self, evt):
+        """帮助"""
+
+        self.sb.SetStatusText(u'帮助', 1)
+
+    def on_about(self, evt):
+        """关于"""
+
+        self.sb.SetStatusText(u'关于', 1)
 
     def control_panel_main(self):
         """
