@@ -5,6 +5,7 @@ import subprocess
 import threading
 
 import wx
+import wx.adv
 from datetime import datetime
 from ppadb.client import Client as AdbClient
 
@@ -178,6 +179,13 @@ class MyFrame(wx.Frame):
             self.on_choice_Android_selected(None)
             self.Android_choice.Bind(wx.EVT_CHOICE, self.on_choice_Android_selected)
 
+        # 加载控件
+        self.animation = wx.adv.AnimationCtrl(self.panel)
+        self.animation.LoadFile("Spinner-1s-30px.gif")  # Replace with your GIF file path
+        self.animation.SetPosition((400, 6))
+        self.animation.Play()
+        self.animation.Hide()
+
         # 创建静态文本(StaticText)对象，将静态文本对象放到panel面板中，所以parent参数传递的是panel，参数label是在静态文本对象上显示的文字，参数pos用于设置静态文本对象的位置
         self.input_click_statictext = wx.StaticText(parent=self.panel, label="请输入本次点赞数量：",
                                                     pos=(10, 40))
@@ -241,8 +249,6 @@ class MyFrame(wx.Frame):
         if hasattr(self, "device"):
             choice = wx.MessageBox('是否关闭', '安卓模拟器已启动', wx.YES_NO | wx.ICON_QUESTION)
             if choice == wx.YES:
-                # # 异步调用关闭模拟器
-                # self.start_device(None)
                 asyncio.run(self.close_simulator())
             else:
                 pass
@@ -288,7 +294,7 @@ class MyFrame(wx.Frame):
             if hasattr(self, "Reconnect_button"):
                 self.Reconnect_button.SetLabel("启动")
             else:
-                self.Reconnect_button = wx.Button(parent=self.panel, label="启动", pos=(360, 10), size=(100, -1))
+                self.Reconnect_button = wx.Button(parent=self.panel, label="启动", pos=(300, 10), size=(100, -1))
             self.Reconnect_button.Bind(wx.EVT_BUTTON, self.start_device)
             print("没有已启动的设备")
 
@@ -297,7 +303,7 @@ class MyFrame(wx.Frame):
             if hasattr(self, "Reconnect_button"):
                 self.Reconnect_button.SetLabel("关闭")
             else:
-                self.Reconnect_button = wx.Button(parent=self.panel, label="关闭", pos=(360, 10), size=(100, -1))
+                self.Reconnect_button = wx.Button(parent=self.panel, label="关闭", pos=(300, 10), size=(100, -1))
             self.Reconnect_button.Bind(wx.EVT_BUTTON, self.stop_device)
 
             # 设备服务（默认值：第一个设备）
@@ -328,6 +334,7 @@ class MyFrame(wx.Frame):
                     self.Close()
             if self.selected_Android_option_name in Android_name_list:
                 self.sb.SetStatusText('状态信息:已启动', 2)
+                self.animation.Hide()
                 self.check_device_connection()
                 break
             else:
@@ -353,6 +360,7 @@ class MyFrame(wx.Frame):
         :return:
         """
         self.sb.SetStatusText('状态信息:启动中', 2)
+        self.animation.Show()
         # 异步调用开启模拟器
         asyncio.run(self.start_simulator())
         # 异步监听开启状态
@@ -390,6 +398,7 @@ class MyFrame(wx.Frame):
                 await asyncio.sleep(0.5)
             else:
                 del self.device
+                self.animation.Hide()
                 self.sb.SetStatusText('状态信息:未启动', 2)
                 self.check_device_connection()
                 break
@@ -407,6 +416,7 @@ class MyFrame(wx.Frame):
         :param event:
         :return:
         """
+        self.animation.Show()
         self.sb.SetStatusText('状态信息:关闭中', 2)
         # 异步调用关闭模拟器
         asyncio.run(self.close_simulator())
