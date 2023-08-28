@@ -114,40 +114,34 @@ class MyFrame(wx.Frame):
         elif tool_id == wx.ID_SAVE:
             print("Save tool clicked")
 
-    def _create_statusbar(self):
-        """创建状态栏"""
-        self.sb.SetStatusText('状态信息:未启动', 2)
+    # def _create_statusbar(self):
+    #     """创建状态栏"""
+    #     self.sb.SetStatusText('状态信息:未启动', 2)
 
     def on_open(self, evt):
         """打开文件"""
-
         self.sb.SetStatusText(u'打开文件1', 1)
 
     def on_save(self, evt):
         """保存文件"""
-
         self.sb.SetStatusText(u'保存文件', 1)
 
     def on_quit(self, evt):
         """退出系统"""
-
         self.sb.SetStatusText(u'退出系统', 1)
         self.Destroy()
 
     def on_help(self, evt):
         """帮助"""
-
         self.sb.SetStatusText(u'帮助', 1)
 
     def on_about(self, evt):
         """关于"""
-
         self.sb.SetStatusText(u'关于', 1)
 
     def control_panel_main(self):
         """
         主控制面板
-        :return:
         """
         self.device_connection_success_statictext = wx.StaticText(parent=self.panel,
                                                                   label="请选择安卓模拟器:",
@@ -176,6 +170,7 @@ class MyFrame(wx.Frame):
                 self.sb.SetStatusText(f'模拟器信息:{Android_list[0]}', 0)
                 self.sb.SetStatusText('', 1)
                 self.sb.SetStatusText('状态信息:未启动', 2)
+            # 初始化下拉列表
             self.on_choice_Android_selected(None)
             self.Android_choice.Bind(wx.EVT_CHOICE, self.on_choice_Android_selected)
 
@@ -238,7 +233,7 @@ class MyFrame(wx.Frame):
 
     def on_close(self, evt):
         """
-        关闭主控制面板窗口
+        关闭主控制面板窗口"x"控件
         :param evt: 当前窗口
         :return:
         """
@@ -247,12 +242,22 @@ class MyFrame(wx.Frame):
         if hasattr(self, "self.new_frame"):
             self.new_frame.Close()
         if hasattr(self, "device"):
-            choice = wx.MessageBox('是否关闭', '安卓模拟器已启动', wx.YES_NO | wx.ICON_QUESTION)
-            if choice == wx.YES:
-                asyncio.run(self.close_simulator())
-            else:
-                pass
-
+            # 通过判断adb服务是否有这个安卓模拟器来决定是否已完全关闭
+            cmd = f'adb -s {self.device.serial} devices'
+            output = subprocess.getoutput(cmd)
+            if self.device.serial in output:
+                choice = wx.MessageBox('是否关闭', '安卓模拟器已启动', wx.YES_NO | wx.ICON_QUESTION)
+                if choice == wx.YES:
+                    # asyncio.run(self.close_simulator())
+                    # 创建一个任务并添加到事件循环中
+                    task = self.loop.create_task(self.close_simulator())
+                    # 主进程结束前等待任务完成
+                    try:
+                        self.loop.run_until_complete(task)
+                    finally:
+                        self.loop.close()
+        else:
+            self.loop.close()
         evt.Skip()
 
     def on_choice_selected(self, event):
@@ -296,7 +301,6 @@ class MyFrame(wx.Frame):
             else:
                 self.Reconnect_button = wx.Button(parent=self.panel, label="启动", pos=(300, 10), size=(100, -1))
             self.Reconnect_button.Bind(wx.EVT_BUTTON, self.start_device)
-            print("没有已启动的设备")
 
         # 存在已启动的设备，显示关闭按钮
         else:
@@ -309,7 +313,6 @@ class MyFrame(wx.Frame):
             # 设备服务（默认值：第一个设备）
             if not hasattr(self,"device"):
                 self.device = self.devices[0]
-            print("存在已启动的设备")
 
     async def listen_start_device(self):
         """
@@ -351,6 +354,7 @@ class MyFrame(wx.Frame):
     def listener_start_thread(self):
         """
         启用开启监听线程
+        run_until_complete：等待运行完毕
         """
         self.loop.run_until_complete(self.listen_start_device())
 
@@ -371,6 +375,8 @@ class MyFrame(wx.Frame):
         开启安卓模拟器
         :return:
         """
+        if not hasattr(self,"selected_Android_option_name"):
+            self.on_choice_Android_selected(None)
         await asyncio.create_subprocess_shell(
             f'/Users/wanghan/Library/Android/sdk/emulator/emulator -avd {self.selected_Android_option_name}',
             stdout=subprocess.DEVNULL,
@@ -387,6 +393,7 @@ class MyFrame(wx.Frame):
             if hasattr(self, "simulator_exit_code"):
                 # 如果关闭失败
                 if self.simulator_exit_code is None or self.simulator_exit_code != 0:
+                    self.animation.Hide()
                     wx.MessageBox('安卓模拟器关闭失败', '警告', wx.YES_NO | wx.ICON_ERROR)
                     self.sb.SetStatusText('状态信息:已启动', 2)
                     break
@@ -420,20 +427,31 @@ class MyFrame(wx.Frame):
         self.sb.SetStatusText('状态信息:关闭中', 2)
         # 异步调用关闭模拟器
         asyncio.run(self.close_simulator())
-        # 异步监听关闭状态
-        threading.Thread(target=self.listener_stop_thread).start()
+        # 通过判断adb服务是否有这个安卓模拟器来决定是否已完全关闭
+        cmd = f'adb -s {self.device.serial} devices'
+        output = subprocess.getoutput(cmd)
+        if self.device.serial in output:
+            # 异步监听关闭状态
+            threading.Thread(target=self.listener_stop_thread).start()
+        else:
+            self.animation.Hide()
+            self.sb.SetStatusText('状态信息:已关闭', 2)
 
     async def close_simulator(self):
         """
         关闭安卓模拟器
         :return:
         """
-        process = await asyncio.create_subprocess_shell(
-            f'adb -s {self.device.serial} emu kill',
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        self.simulator_exit_code = await process.wait()
+        # 确保模拟器没关闭
+        cmd = f'adb -s {self.device.serial} devices'
+        output = subprocess.getoutput(cmd)
+        if self.device.serial in output:
+            process = await asyncio.create_subprocess_shell(
+                f'adb -s {self.device.serial} emu kill',
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            self.simulator_exit_code = await process.wait()
 
     def open_config_button(self, event):
         """
