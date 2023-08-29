@@ -1,0 +1,5 @@
+[2023-08-29 19:28:19][INFO][1line385] Traceback (most recent call last):
+  File "/Users/wanghan/Desktop/code/direct_seeding/wxpython_continuous_mouse_click.py", line 376, in check_selected_device_status
+    self.device = self.devices_info[self.selected_Android_option_name]["server"]
+KeyError: 'server'
+

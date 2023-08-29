@@ -1,5 +1,6 @@
 import asyncio
 import configparser
+import functools
 import os
 import subprocess
 import threading
@@ -9,6 +10,7 @@ import wx.adv
 from datetime import datetime
 from ppadb.client import Client as AdbClient
 
+from logger import logger
 
 # 自定义窗口类MyFrame
 class MyFrame(wx.Frame):
@@ -237,11 +239,11 @@ class MyFrame(wx.Frame):
             # 为当前线程创建独享的事件循环，避免多线程间的事件循环干扰
             closeX_loop = asyncio.new_event_loop()  # 创建独立的事件循环
             asyncio.set_event_loop(closeX_loop)  # 设置事件循环为当前线程的循环
-            closeX_loop.run_until_complete(self.create_close_simulator_task(None))  # 创建关闭模拟器的任务
+            closeX_loop.run_until_complete(self.create_close_simulator_task())  # 创建关闭模拟器的任务
             closeX_loop.close()  # 关闭事件循环
         evt.Skip()
 
-    async def create_close_simulator_task(self, event):
+    async def create_close_simulator_task(self):
         """
         创建关闭模拟器的任务
         :param event:
@@ -262,7 +264,7 @@ class MyFrame(wx.Frame):
             return
         choice = wx.MessageBox('是否关闭', f'模拟器 {running_name} 已启动', wx.YES_NO | wx.ICON_QUESTION)
         if choice == wx.YES:
-            await self.close_simulator()
+            await self.close_simulator(device)
 
     def on_choice_selected(self, event):
         """
@@ -275,9 +277,12 @@ class MyFrame(wx.Frame):
         # 获取选中设备的名称
         self.selected_Android_option_name = self.Android_choice.GetString(selected_index)
         # 开启关闭控件
-        status = self.check_selected_device_status()
-        if status:
+        status = self.check_selected_device_status(self.selected_Android_option_name)
+        self.check_animation_status()
+        # 已开启、关闭中（显关闭按钮）
+        if status in ['started','unstarting']:
             self.switch_off_button()
+        # 开启中、未启动（显开启按钮）
         else:
             self.switch_on_button()
 
@@ -308,7 +313,6 @@ class MyFrame(wx.Frame):
         展示启动按钮
         :return:
         """
-        self.animation.Hide()
         self.sb.SetStatusText('状态信息:未启动', 2)
         if hasattr(self, "Reconnect_button"):
             self.Reconnect_button.SetLabel("启动")
@@ -321,7 +325,6 @@ class MyFrame(wx.Frame):
         展示关闭按钮
         :return:
         """
-        self.animation.Hide()
         self.sb.SetStatusText('状态信息:已启动', 2)
         if hasattr(self, "Reconnect_button"):
             self.Reconnect_button.SetLabel("关闭")
@@ -329,47 +332,109 @@ class MyFrame(wx.Frame):
             self.Reconnect_button = wx.Button(parent=self.panel, label="关闭", pos=(300, 10), size=(100, -1))
         self.Reconnect_button.Bind(wx.EVT_BUTTON, self.stop_device)
 
-    def check_selected_device_status(self):
+    def check_animation_status(self):
+        """动态加载状态"""
+        if self.selected_Android_option_name in self.devices_info and self.devices_info[self.selected_Android_option_name]:
+            # 启动中、关闭中
+            if self.devices_info[self.selected_Android_option_name]["status"] in ["starting","unstarting"]:
+                self.animation.Show()
+            # 已启动
+            else:
+                self.animation.Hide()
+        # 未启动
+        else:
+            self.animation.Hide()
+
+    def check_selected_device_status(self,selected_Android_option_name):
         """
-        检查选中的设备启动状态，来显示开启关闭，并切换服务到指定设备
+        检查选中的设备启动状态
+        (用于显示开启关闭，并切换服务到指定设备)
         :return: 是/否
         """
-        try:
-            # 获取所有已启动设备的名称
-            running_Android_name_dict = {}
-            for index, device in enumerate(self.devices):
-                cmd = f'adb -s {device.serial} shell getprop ro.boot.qemu.avd_name'
-                running_name = subprocess.getoutput(cmd)
-                running_Android_name_dict[running_name] = index
-        except subprocess.CalledProcessError:
-            running_Android_name_dict = {}
-        # 下拉框选择的设备已开启
-        if self.selected_Android_option_name in running_Android_name_dict:
-            self.device = self.devices[running_Android_name_dict[self.selected_Android_option_name]]
-            return True
+        # 查看设备信息下是否记录有当前设备
+        if selected_Android_option_name in self.devices_info:
+            status = self.devices_info[selected_Android_option_name]["status"]
+            # 已启动
+            if status == "started":
+                # 已启动
+                self.device = self.devices_info[selected_Android_option_name]["server"]
+                return "started"
+            # 启动中
+            elif status == "starting":
+                # 获取所有已启动设备的名称
+                running_Android_name = {}
+                for index, device in enumerate(self.devices):
+                    cmd = f'adb -s {device.serial} shell getprop ro.boot.qemu.avd_name'
+                    running_name = subprocess.getoutput(cmd)
+                    running_Android_name[running_name] = index
+                # 已启动
+                if selected_Android_option_name in running_Android_name:
+                    self.device = self.devices[running_Android_name[selected_Android_option_name]]
+                    self.devices_info[selected_Android_option_name]["server"] = self.devices[running_Android_name[selected_Android_option_name]]
+                    self.devices_info[selected_Android_option_name]["status"] = "started"
+                    return "started"
+                # 启动中
+                else:
+                    return "starting"
+            # 未启动、关闭中
+            else:
+                return status
         else:
-            return False
+            try:
+                # 获取所有已启动设备的名称
+                running_Android_name = {}
+                for index, device in enumerate(self.devices):
+                    cmd = f'adb -s {device.serial} shell getprop ro.boot.qemu.avd_name'
+                    running_name = subprocess.getoutput(cmd)
+                    running_Android_name[running_name] = index
 
-    async def listen_start_device(self):
+                # 下拉框选择的设备已开启
+                self.devices_info[selected_Android_option_name] = {}
+                if selected_Android_option_name in running_Android_name:
+                    # 经检测已启动
+                    self.device = self.devices[running_Android_name[selected_Android_option_name]]
+                    self.devices_info[selected_Android_option_name]["server"] = self.devices[running_Android_name[selected_Android_option_name]]
+                    self.devices_info[selected_Android_option_name]["status"] = "started"
+                    return "started"
+                else:
+                    # 未启动
+                    self.devices_info[selected_Android_option_name]["status"] = "unstarted"
+                    return "unstarted"
+            except:
+                import traceback
+                logger.info(traceback.format_exc())
+                return "unstarted"
+
+    async def listen_start_device(self,selected_Android_option_name):
         """
         异步监听模拟器是否已完全 "开启"（启动过程中需要）
         """
-        sleep_time = 0
+        sleep_count = 0  # 休眠次数
         while True:
-            status = self.check_selected_device_status()
-            if status:
+            status = self.check_selected_device_status(selected_Android_option_name)
+            # 已启动
+            if status == "started":
+                self.animation.Hide()
                 self.switch_off_button()
                 break
-            else:
-                if sleep_time <= 30:
-                    sleep_time += 1
+            # 启动中、未启动
+            elif status in ["unstarted","starting"]:
+                if sleep_count <= 30:
+                    sleep_count += 1
                     self.devices = self.client.devices()
+                    self.devices_info[selected_Android_option_name]["status"] = "starting"
                     await asyncio.sleep(0.5)
                 else:
                     # 启动超时
+                    self.animation.Hide()
                     self.switch_on_button()
                     wx.MessageBox('安卓模拟器启动失败', '警告', wx.YES_NO | wx.ICON_ERROR)
                     break
+            else:
+                self.animation.Show()
+                self.sb.SetStatusText('状态信息:关闭中', 2)
+                self.switch_on_button()
+                break
 
     async def process_concurrent(self,func):
         """
@@ -377,15 +442,15 @@ class MyFrame(wx.Frame):
         """
         await asyncio.gather(func())
 
-    def listener_start_thread(self):
+    def listener_start_thread(self,selected_Android_option_name):
         """
         启用监听开启线程
         """
         # 为当前线程创建独享的事件循环，避免多线程间的事件循环干扰
         start_loop = asyncio.new_event_loop()  # 创建独立的事件循环
         asyncio.set_event_loop(start_loop)  # 设置事件循环为当前线程的循环
-        # run_until_complete：等待运行完毕
-        start_loop.run_until_complete(self.process_concurrent(self.listen_start_device))
+        listen_start_device = functools.partial(self.listen_start_device,selected_Android_option_name)
+        start_loop.run_until_complete(self.process_concurrent(listen_start_device))  # run_until_complete：等待运行完毕
         start_loop.close()  # 关闭事件循环
 
     def start_device(self, event):
@@ -393,14 +458,27 @@ class MyFrame(wx.Frame):
         未检测到启动设备时，启动对应的安卓模拟器
         :return:
         """
-        status = self.check_selected_device_status()
-        if not status:
+        status = self.check_selected_device_status(self.selected_Android_option_name)
+        # 未启动
+        if status == "unstarted":
             self.animation.Show()
             self.sb.SetStatusText('状态信息:启动中', 2)
             # 异步调用开启模拟器
             asyncio.run(self.start_simulator())
             # 异步监听开启状态
-            threading.Thread(target=self.listener_start_thread).start()
+            listener_start_thread = functools.partial(self.listener_start_thread,self.selected_Android_option_name)
+            threading.Thread(target=listener_start_thread).start()
+        elif status == "starting":
+            self.sb.SetStatusText('状态信息:启动中', 2)
+        elif status == "started":
+            self.animation.Hide()
+            self.sb.SetStatusText('状态信息:已启动', 2)
+            self.switch_off_button()
+        #    status == "unstarting"
+        else:
+            self.animation.Show()
+            self.sb.SetStatusText('状态信息:关闭中', 2)
+            self.switch_on_button()
 
     async def start_simulator(self):
         """
@@ -415,20 +493,49 @@ class MyFrame(wx.Frame):
             stderr=subprocess.DEVNULL
         )
 
-    def check_device_in_adb_devices(self):
+    def check_device_in_adb_devices(self,selected_Android_option_name):
         """
         检查设备是否在 "adb devices" 已连接设备
         :return: 是/否
         """
-        # 通过判断adb服务是否有这个安卓模拟器来决定是否已完全关闭
-        cmd = f'adb -s {self.device.serial} devices'
-        output = subprocess.getoutput(cmd)
-        if self.device.serial in output:
-            return True
+        # 查看设备信息下是否记录有当前设备
+        if selected_Android_option_name in self.devices_info:
+            status = self.devices_info[selected_Android_option_name]["status"]
+            # 未启动
+            if status == "unstarted":
+                del self.devices_info[selected_Android_option_name]
+                return "unstarted"
+            # 关闭中
+            elif status == "unstarting":
+                cmd = f'adb -s {self.device.serial} devices'
+                output = subprocess.getoutput(cmd)
+                # 关闭中
+                if self.device.serial in output:
+                    return "unstarting"
+                # 未启动
+                else:
+                    del self.devices_info[selected_Android_option_name]
+                    return "unstarted"
+            # 已启动、启动中
+            else:
+                cmd = f'adb -s {self.device.serial} devices'
+                output = subprocess.getoutput(cmd)
+                if self.device.serial not in output:
+                    del self.devices_info[selected_Android_option_name]
+                    return "unstarted"
+                return status
         else:
-            return False
+            # 通过判断adb服务是否有这个安卓模拟器来决定是否已完全关闭
+            cmd = f'adb -s {self.device.serial} devices'
+            output = subprocess.getoutput(cmd)
+            if self.device.serial in output:
+                return "started"
+            else:
+                # 未启动
+                del self.devices_info[selected_Android_option_name]
+                return "unstarted"
 
-    async def listen_stop_device(self):
+    async def listen_stop_device(self,selected_Android_option_name):
         """
         异步监听安卓模拟器是否已完全关闭
         :return:
@@ -438,19 +545,29 @@ class MyFrame(wx.Frame):
             if hasattr(self, "simulator_exit_code"):
                 # 如果关闭失败
                 if self.simulator_exit_code is None or self.simulator_exit_code != 0:
+                    self.animation.Hide()
                     self.switch_off_button()
                     wx.MessageBox('安卓模拟器关闭失败', '警告', wx.YES_NO | wx.ICON_ERROR)
                     break
 
-            status = self.check_device_in_adb_devices()
-            if status:
-                await asyncio.sleep(0.5)
-            else:
-                del self.device
+            status = self.check_device_in_adb_devices(selected_Android_option_name)
+            # 已关闭（已筛选，此处没有其他状态）
+            if status == "unstarted":
+                self.animation.Hide()
                 self.switch_on_button()
                 break
+            # 已启动、关闭中
+            elif status in ['started','unstarting']:
+                self.devices_info[selected_Android_option_name]["status"] = "unstarting"
+                await asyncio.sleep(0.5)
+            # 启动中
+            else:
+                self.animation.Show()
+                self.sb.SetStatusText('状态信息:启动中', 2)
+                self.switch_off_button()
+                break
 
-    def listener_stop_thread(self):
+    def listener_stop_thread(self,selected_Android_option_name):
         """
         启用关闭监听线程
         :return:
@@ -458,7 +575,8 @@ class MyFrame(wx.Frame):
         # 为当前线程创建独享的事件循环，避免多线程间的事件循环干扰
         stop_loop = asyncio.new_event_loop()  # 创建独立的事件循环
         asyncio.set_event_loop(stop_loop)  # 设置事件循环为当前线程的循环
-        stop_loop.run_until_complete(self.process_concurrent(self.listen_stop_device))
+        listen_stop_device = functools.partial(self.listen_stop_device,selected_Android_option_name)
+        stop_loop.run_until_complete(self.process_concurrent(listen_stop_device))
         stop_loop.close()  # 关闭事件循环
 
     def stop_device(self,event):
@@ -468,25 +586,35 @@ class MyFrame(wx.Frame):
         :return:
         """
         # 关闭前检查是否在开启状态
-        status = self.check_device_in_adb_devices()
-        if status:
+        status = self.check_device_in_adb_devices(self.selected_Android_option_name)
+        if status == 'started':
             self.animation.Show()
             self.sb.SetStatusText('状态信息:关闭中', 2)
             # 异步调用关闭模拟器
             asyncio.run(self.close_simulator())
             # 异步监听关闭状态
-            threading.Thread(target=self.listener_stop_thread).start()
-        else:
-            del self.device
+            listener_stop_thread = functools.partial(self.listener_stop_thread,self.selected_Android_option_name)
+            threading.Thread(target=listener_stop_thread).start()
+        elif status == 'unstarting':
+            self.sb.SetStatusText('状态信息:关闭中', 2)
+        elif status == 'unstarted':
+            self.animation.Hide()
             self.switch_on_button()
+        #   status == 'starting'
+        else:
+            self.animation.Show()
+            self.sb.SetStatusText('状态信息:开启中', 2)
+            self.switch_off_button()
 
-    async def close_simulator(self):
+    async def close_simulator(self,device=None):
         """
         关闭安卓模拟器
         :return:
         """
+        if not device:
+            device = self.device
         process = await asyncio.create_subprocess_shell(
-            f'adb -s {self.device.serial} emu kill',
+            f'adb -s {device.serial} emu kill',
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -662,9 +790,7 @@ class MyFrame(wx.Frame):
                                                                       label=f"请稍后，点赞中······（当前点赞任务：{self.current_click_num}，点赞间隔：{self.click_T}，累计点赞：{self.total_click_num}）",
                                                                       pos=(10, 130))
         else:
-            pass
-            # TODO 需要写入日志文件
-            # print(f"第{total_likes}次点击失败")
+            logger.info(f"第{total_likes}次点击失败")
 
     def click_cancel_control(self, evt):
         """
