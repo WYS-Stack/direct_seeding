@@ -5,3 +5,5 @@ build
 dist
 wxpython_continuous_mouse_click.spec
 logs
+.idea
+.DS_Store
