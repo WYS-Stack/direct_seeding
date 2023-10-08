@@ -53,7 +53,7 @@ class MyFrame(wx.Frame):
         # 历史记录面板
         self.history_popup = None
         # 历史记录文件
-        self.history_filename = 'history.txt'
+        self.history_filename = 'config/history.txt'
         # 历史记录
         self.history_list = self.read_history(self.history_filename)
 

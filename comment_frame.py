@@ -263,7 +263,7 @@ class CommentWindow(QMainWindow):
         :param sheet_name: 要加载的Excel工作表的名称
         :param table_widget: 要填充数据的Qt表格部件
         """
-        excel_file = "comment_data.xlsx"
+        excel_file = "config/comment_data.xlsx"
         # 加载Excel数据
         wb = openpyxl.load_workbook(excel_file)
         # 选择指定的工作表
@@ -313,7 +313,7 @@ class CommentWindow(QMainWindow):
         table_widget = self.right_widget.currentWidget()
 
         if isinstance(table_widget,QTableWidget):
-            excel_file = "comment_data.xlsx"
+            excel_file = "config/comment_data.xlsx"
             wb = openpyxl.load_workbook(excel_file)
             sheet = wb[sheet_name]
 

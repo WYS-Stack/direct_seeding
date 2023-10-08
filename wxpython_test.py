@@ -8,7 +8,7 @@ class MyFrame(wx.Frame):
         self.panel = wx.Panel(self)
         self.text_ctrl = wx.TextCtrl(self.panel, style=wx.TE_PROCESS_ENTER)
         self.history_popup = None
-        self.history_filename = 'history.txt'
+        self.history_filename = 'config/history.txt'
         self.history_list = self.read_history(self.history_filename)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
