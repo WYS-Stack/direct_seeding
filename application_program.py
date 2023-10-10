@@ -1,3 +1,5 @@
+import time
+
 import requests
 import os
 import wx
@@ -53,22 +55,28 @@ class App_Program:
                     download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
                     return version, download_url
 
-    async def check_application_version(self):
+    async def check_application_version(self, timeout=30):
         """
         检查应用程序版本号
-        :return: 本地应用程序版本
+        :param timeout: 最大等待时间（秒）
+        :return: 本地应用程序版本或 None（如果超时）
         """
         cmd = "adb -s {} shell dumpsys package {} | grep 'versionName' | awk -F= '{{print $2}}'".format(self.serial,
                                                                                                         self.package_name)
-        while True:
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
             application_version = subprocess.getoutput(cmd)
-            logger.info(f"检测本地App版本：{application_version}")
+            logger.info(f"App本地版本：{application_version}")
             logger.info(f"{cmd}")
 
             if "." in application_version:
                 return application_version
 
             await asyncio.sleep(1)
+
+        logger.warning("获取应用程序版本号超时")
+        return None
 
     async def compare_version(self, version, local_version):
         """
@@ -107,31 +115,33 @@ class App_Program:
         Application_program_status = subprocess.getoutput(cmd)
         version, download_url = await self.request_latest_download_info()
         logger.info(f"App最新版本：{version}")
-        logger.info(f"App最新apk地址：{download_url}")
         # 应用程序存在时 比较版本
         if Application_program_status:
-            logger.info("APP状态：存在")
             if version and download_url:
                 # 已安装版本
                 local_version = await self.check_application_version()
-                # 版本不一致
-                difference = await self.compare_version(version, local_version)
-                if difference >= 2:
-                    logger.info(f"App本地版本：{local_version}")
-                    uninstall_status = await self.uninstall_application_program()
-                    if uninstall_status == "Success":
-                        wx.CallAfter(self.update_status, "卸载成功")
+                if local_version:
+                    # 版本不一致
+                    difference = await self.compare_version(version, local_version)
+                    if difference >= 2:
+                        logger.info(f"App本地版本：{local_version}")
+                        uninstall_status = await self.uninstall_application_program()
+                        if uninstall_status == "Success":
+                            wx.CallAfter(self.update_status, "卸载成功")
+                        else:
+                            wx.CallAfter(self.update_status, "卸载失败")
+                        await self.start_download(version, download_url)
+                        await self.install_Application_Program(version)
                     else:
-                        wx.CallAfter(self.update_status, "卸载失败")
-                    await self.start_download(version, download_url)
-                    await self.install_Application_Program(version)
+                        logger.info("App版本通过！")
                 else:
-                    logger.info("App版本通过！")
+                    logger.info("未检测到本地版本")
             else:
                 logger.info("App最新版本和下载地址请求错误！")
         # 应用程序不存在时 直接下载安装
         else:
             logger.info("APP状态：不存在")
+            logger.info(f"最新apk地址：{download_url}")
             if version and download_url:
                 await self.start_download(version, download_url)
                 await self.install_Application_Program(version)
@@ -248,15 +258,29 @@ class App_Program:
         run_wifi_status = subprocess.getoutput(cmd)
         return run_wifi_status
 
-    def check_application_program_running_status(self):
+    def check_application_program_running_status(self, listen=False, max_wait_time=30):
         """
         检查应用程序运行状态
-        :return:
+        :param max_wait_time: 最大等待时间（秒）
+        :param listen: 是否启用监听模式
+        :return: 应用程序是否在运行中
         """
         cmd = f'adb -s {self.serial} shell pidof -s {self.package_name}'
         logger.info(f"检测APP运行状态：{cmd}")
         running_status = subprocess.getoutput(cmd)
-        return running_status
+        if running_status:
+            return True  # 应用程序在运行中
+
+        if listen:
+            start_time = time.time()
+            while time.time() - start_time < max_wait_time:
+                running_status = subprocess.getoutput(cmd)
+                logger.info(f"APP启动中...")
+                if running_status:
+                    return True  # 应用程序在运行中
+                time.sleep(1)  # 等待1秒再次检查
+            logger.info("运行超时")
+        return False  # 等待超时，应用程序未在运行中
 
     async def start_application_program(self):
         """
@@ -274,8 +298,8 @@ class App_Program:
 
             if start_application_program_status:
                 # 再次检查运行状态
-                running_status2 = self.check_application_program_running_status()
-                if running_status2:
+                listen_running_status = self.check_application_program_running_status(listen=True)
+                if listen_running_status:
                     logger.info("APP启动成功")
                 else:
                     logger.info("APP启动失败！")
@@ -284,13 +308,25 @@ class App_Program:
                 choice = wx.MessageBox('是否尝试重启', 'APP启动失败', wx.YES_NO | wx.ICON_QUESTION)
                 if choice == wx.YES:
                     logger.info("尝试重启APP中...")
-                    start_application_program_status2 = subprocess.getoutput(cmd)
-                    if start_application_program_status2:
+                    start_application_program_status = subprocess.getoutput(cmd)
+                    if start_application_program_status:
                         logger.info("APP启动成功")
                     else:
                         logger.info("APP启动失败！")
         else:
             logger.info(f"{self.app_name}已启动！")
+
+    async def start_atx_agent(self):
+        """
+        启动ATX
+        :return:
+        """
+        cmd = f"adb -s {self.serial} shell /data/local/tmp/atx-agent server -d"
+        start_atx_agent_status = subprocess.getoutput(cmd)
+        if start_atx_agent_status:
+            logger.info("atx-agent运行成功")
+        else:
+            logger.info("atx-agent运行失败")
 
     async def force_restart_application_program(self):
         """

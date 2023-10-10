@@ -57,11 +57,6 @@ class MyFrame(wx.Frame):
         # 历史记录
         self.history_list = self.read_history(self.history_filename)
 
-        # # 由于事件循环是线程相关的，不应该在不同线程之间共享self.loop，因此需要为每个线程创建独立的事件循环
-        # # 如果在多线程中使用事件循环可能会导致问题，因为多线程环境下的事件循环不是线程安全的
-        # # 创建全局的事件循环
-        # self.loop = asyncio.get_event_loop()
-
         # 线程
         self.thread = None
         # 取消标签
@@ -756,7 +751,8 @@ class MyFrame(wx.Frame):
                 return "started"
             else:
                 # 未启动
-                del self.devices_info[selected_android_option_name]
+                if self.devices_info.get(selected_android_option_name):
+                    del self.devices_info[selected_android_option_name]
                 return "unstarted"
 
     async def listen_stop_device(self, selected_android_option_name):
@@ -890,61 +886,84 @@ class MyFrame(wx.Frame):
         # 抖音主页面
         if not d(resourceId="com.ss.android.ugc.aweme:id/c6+").exists:  # 直播间右上角❌按钮
             logger.info("开始进入直播间")
-            if d(resourceId="com.ss.android.ugc.aweme:id/j1+").click_exists():  # 点击🔍按钮
-                logger.info("确定当前为首页")
-                logger.info("已点击搜索🔍按钮")
-                # 输入ID
-                await asyncio.to_thread(d.send_keys, f"{self.app_id}", clear=True)  # 输入ID
-                logger.info("已输入ID")
-                if d(resourceId="com.ss.android.ugc.aweme:id/cw").click_exists():  # 点击头像 进入账号详情
-                    logger.info("已查询到账号直播信息")
-                    if d(resourceId="com.ss.android.ugc.aweme:id/o2z").click_exists():  # 点击账号信息页面的头像 进入直播间
-                        logger.info("成功进入直播间")
+            # 关闭以下弹窗
+            if d(resourceId="com.ss.android.ugc.aweme:id/jh").exists: # "可能认识的好友"窗口
+                d(resourceId="com.ss.android.ugc.aweme:id/close").click_exists() # 关闭窗口
+            if d(resourceId="com.ss.android.ugc.aweme:id/rxd").exists: # 检测到更新框口
+                d(resourceId="com.ss.android.ugc.aweme:id/k_y").click_exists() # 点击"以后再说"关闭
+            if d(resourceId="com.ss.android.ugc.aweme:id/j1+").wait() or d(resourceId="com.ss.android.ugc.aweme:id/xkp").wait() or d(resourceId="com.ss.android.ugc.aweme:id/o2z").wait():
+                if d(resourceId="com.ss.android.ugc.aweme:id/j1+").click_exists():  # 点击🔍按钮
+                    logger.info("确定当前为首页")
+                    logger.info("已点击搜索🔍按钮")
+                    # 输入ID
+                    await asyncio.to_thread(d(focused=True).set_text, f"{self.app_id}")  # 输入ID
+                    logger.info("已输入ID")
+                    if d(resourceId="com.ss.android.ugc.aweme:id/cw").click_exists() or d(resourceId="com.ss.android.ugc.aweme:id/uej").click_exists():  # 点击头像 或名片 进入账号详情
+                        logger.info("已查询到账号直播信息")
+                        if d(resourceId="com.ss.android.ugc.aweme:id/k_8").exists: # 账号详情页 直播标志
+                            if d(resourceId="com.ss.android.ugc.aweme:id/o2z").click_exists():  # 点击账号信息页面的头像 进入直播间
+                                enter_status = self.wait_full_enter_live_broadcast(d)
+                                if enter_status:
+                                    logger.info("成功进入直播间")
+                                    self.enter_live_broadcast_event.set()
+                            else:
+                                logger.warning("无法点击头像进入直播间")
+                        else:
+                            logger.info("未直播（未找到直播标志）")
+                            wx.CallAfter(self.on_task_completed, "未直播")
+                    elif d(resourceId="com.ss.android.ugc.aweme:id/xkp").click_exists():  # 点击'搜索'按钮
+                        logger.info("已点击搜索按钮")
+                        if d.xpath(  # 点击头像进入直播间
+                                '//*[@resource-id="com.ss.android.ugc.aweme:id/lxd"]/android.widget.LinearLayout['
+                                '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                                '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                                '1]/com.lynx.tasm.behavior.ui.view.UIView[3]').click_exists():
+                            enter_status = self.wait_full_enter_live_broadcast(d)
+                            if enter_status:
+                                logger.info("成功进入直播间")
+                                self.enter_live_broadcast_event.set()
+                        else:
+                            logger.info("未搜索到账号直播信息")
+                            wx.CallAfter(self.on_task_completed, "未搜索到账号直播信息")
+                            return
                     else:
-                        logger.warning("无法点击头像进入直播间")
-                elif d(resourceId="com.ss.android.ugc.aweme:id/xkp").click_exists():  # 点击'搜索'按钮
-                    logger.info("已点击搜索按钮")
-                    if d.xpath(  # 点击头像进入直播间
-                            '//*[@resource-id="com.ss.android.ugc.aweme:id/lxd"]/android.widget.LinearLayout['
-                            '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
-                            '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
-                            '1]/com.lynx.tasm.behavior.ui.view.UIView[2]').click_exists():
-                        logger.info("成功进入直播间")
-                    else:
-                        logger.info("未搜索到账号直播信息")
-                        wx.CallAfter(self.on_task_completed, "未搜索到账号直播信息")
+                        logger.info("未查询到账号直播信息")
+                        wx.CallAfter(self.on_task_completed, "未查询到账号直播信息")
                         return
-                else:
-                    logger.info("未查询到账号直播信息")
-                    wx.CallAfter(self.on_task_completed, "未查询到账号直播信息")
-                    return
-            # 抖音搜索页面
-            elif d(resourceId="com.ss.android.ugc.aweme:id/xkp").exists:  # '搜索'按钮是否存在
-                logger.info("确定当前为搜索页面")
-                await asyncio.to_thread(d.send_keys, f"{self.app_id}", clear=True)  # 输入ID
-                logger.info("已输入ID")
-                if d(resourceId="com.ss.android.ugc.aweme:id/xkp").click_exists():  # 点击'搜索'按钮
-                    logger.info("已点击搜索到的信息")
-                    if d.xpath(  # 点击头像进入直播间
-                            '//*[@resource-id="com.ss.android.ugc.aweme:id/lxd"]/android.widget.LinearLayout['
-                            '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
-                            '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
-                            '1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.view.UIView['
-                            '3]').click_exists():
-                        logger.info("成功进入直播间")
+                # 抖音搜索页面
+                elif d(resourceId="com.ss.android.ugc.aweme:id/xkp").exists:  # '搜索'按钮是否存在
+                    logger.info("确定当前为搜索页面")
+                    await asyncio.to_thread(d(focused=True).set_text, f"{self.app_id}")  # 输入ID
+                    logger.info("已输入ID")
+                    if d(resourceId="com.ss.android.ugc.aweme:id/xkp").click_exists():  # 点击'搜索'按钮
+                        logger.info("已点击搜索到的信息")
+                        if d.xpath(  # 点击头像进入直播间
+                                '//*[@resource-id="com.ss.android.ugc.aweme:id/lxd"]/android.widget.LinearLayout['
+                                '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                                '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                                '1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.view.UIView['
+                                '3]').click_exists():
+                            enter_status = self.wait_full_enter_live_broadcast(d)
+                            if enter_status:
+                                logger.info("成功进入直播间")
+                                self.enter_live_broadcast_event.set()
+                        else:
+                            logger.info("未搜索到账号直播信息")
+                            wx.CallAfter(self.on_task_completed, "未搜索到账号直播信息")
+                            return
                     else:
-                        logger.info("未搜索到账号直播信息")
-                        wx.CallAfter(self.on_task_completed, "未搜索到账号直播信息")
+                        logger.info("未查询到账号直播信息")
+                        wx.CallAfter(self.on_task_completed, "未查询到账号直播信息")
                         return
-                else:
-                    logger.info("未查询到账号直播信息")
-                    wx.CallAfter(self.on_task_completed, "未查询到账号直播信息")
-                    return
-            # 账号信息页面
-            elif d(resourceId="com.ss.android.ugc.aweme:id/o2z").exists(): # 账号信息页面的 头像 是否存在
-                logger.info("确定当前为账号信息页面")
-                d.press("back") # 返回上一级页面
-                await self.enter_douyin_live_broadcast_room() # 重新执行一次
+                # 账号信息页面
+                elif d(resourceId="com.ss.android.ugc.aweme:id/o2z").exists:  # 账号信息页面的 头像 是否存在
+                    if d(resourceId="com.ss.android.ugc.aweme:id/k_8").exists:  # 账号详情页 直播标志
+                        logger.info("确定当前为账号信息页面")
+                        d.press("back")  # 返回上一级页面
+                        await self.enter_douyin_live_broadcast_room()  # 重新执行一次
+                    else:
+                        logger.info("未直播（未找到直播标志）")
+                        wx.CallAfter(self.on_task_completed, "未直播")
             else:
                 logger.info("未确定当前页面")
                 if not hasattr(self, "force_flag"):
@@ -957,6 +976,7 @@ class MyFrame(wx.Frame):
                     await self.enter_douyin_live_broadcast_room()
         else:
             logger.info("已进入直播间")
+            self.enter_live_broadcast_event.set()
 
     async def enter_xiaohongshu_live_broadcast_room(self):
         """
@@ -969,10 +989,71 @@ class MyFrame(wx.Frame):
         启动应用程序
         """
         self.app = App_Program(self.panel, self.device.serial, self.Application_program_name)
+        # 启动atx-agent
+        await self.app.start_atx_agent()
         # 检查应用程序
         await self.app.check_application_program()
         # 启动应用程序
         await self.app.start_application_program()
+
+    @staticmethod
+    def wait_full_enter_live_broadcast(d, timeout=300):
+        """
+        等待完全进入直播间
+        :param d: 连接设备服务
+        :param timeout: 最大等待时间（秒）
+        :return:
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if d(resourceId="com.ss.android.ugc.aweme:id/c6+").exists:
+                return True
+            logger.info("等待进入直播间...")
+            time.sleep(1)
+        return False
+
+    def wait_device_full_start(self, timeout=300):
+        """
+        等待模拟器完全启动
+        :param timeout: 最大等待时间（秒）
+        :return: 是否成功
+        """
+        cmd = f'adb -s {self.device.serial} shell getprop sys.boot_completed'
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            output = subprocess.getoutput(cmd)
+            if output == "1":
+                logger.info("设备已完成启动")
+                return True
+            logger.info("启动中...")
+            time.sleep(2)
+
+        logger.warning("设备启动超时")
+        return False
+
+    def wait_device_start(self, timeout=300):
+        """
+        等待模拟器启动
+        :param timeout: 最大等待时间（秒）
+        :return:
+        """
+        choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
+        start_time = time.time()
+        if choice == wx.YES:
+            # 启动
+            self.start_device(None)
+
+            while time.time() - start_time < timeout:
+                if hasattr(self, "device"):
+                    break
+                logger.info("等待启动中...")
+                time.sleep(1)
+
+            device_status = self.wait_device_full_start()
+            if device_status:
+                # 设置事件，通知主线程操作已完成
+                self.before_start_event.set()
 
     def before_start_control_check(self):
         """
@@ -982,7 +1063,7 @@ class MyFrame(wx.Frame):
         self.app_id = self.app_id_text_ctrl.GetValue()
         if not self.app_id:
             wx.MessageBox("用户ID不能为空！", "提示")
-            return False
+            return
 
         # 获取手动点赞框输入的点赞数量
         self.current_click_num = "" if not self.input_click_text_ctrl.GetValue() else int(
@@ -996,40 +1077,26 @@ class MyFrame(wx.Frame):
 
         if not self.current_click_num and not self.checked and not self.comment_checked:
             wx.MessageBox('1.请输入点赞次数\n2.选中点赞任务\n3.选择评论任务', '提示', wx.OK | wx.ICON_INFORMATION)
-            return False
+            return
         elif self.current_click_num <= 0:
             wx.MessageBox('点赞数量要大于0', '提示', wx.OK | wx.ICON_INFORMATION)
 
         # 防止未启动设备直接开始
         if self.devices_info.get(self.selected_android_option_name, {}).get("status") == "started":
             if not hasattr(self, "device"):
-                choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
-                if choice == wx.YES:
-                    self.start_device(None)
-                    while not hasattr(self, "device"):
-                        logger.info("等待启动中...")
-                        time.sleep(1)
-                    # 设置事件，通知主线程操作已完成
-                    self.before_start_event.set()
-                    return True
+                self.wait_device_start()
+            else:
+                listen_stop_device = functools.partial(self.listen_stop_device, self.selected_android_option_name)
+                asyncio.run(listen_stop_device())
+                if self.devices_info.get(self.selected_android_option_name):
+                    device_status = self.wait_device_full_start()
+                    if device_status:
+                        # 设置事件，通知主线程操作已完成
+                        self.before_start_event.set()
                 else:
-                    return False
-            else:
-                # 设置事件，通知主线程操作已完成
-                self.before_start_event.set()
-                return True
+                    self.wait_device_start()
         else:
-            choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
-            if choice == wx.YES:
-                self.start_device(None)
-                while self.devices_info.get(self.selected_android_option_name, {}).get(
-                        "status") != "started" and not hasattr(self, "device"):
-                    logger.info("等待启动中...")
-                    time.sleep(1)
-                self.before_start_event.set()
-                return True
-            else:
-                return False
+            self.wait_device_start()
 
     async def listen_before_start(self):
         """
@@ -1037,37 +1104,41 @@ class MyFrame(wx.Frame):
         :return:
         """
         # 在主线程中等待开始前准备工作完成
-        if self.before_start_event.wait(timeout=10):
+        if self.before_start_event.wait():
             # 启动应用程序
             await self.application_program_main()
-
-            # 进入直播间
+            await asyncio.sleep(3)  # 给予app启动一定的加载时间
+            # 进入直播间事件
+            self.enter_live_broadcast_event = threading.Event()
             if self.Application_program_name == "抖音":
                 await self.enter_douyin_live_broadcast_room()
             else:  # 小红书
                 await self.enter_xiaohongshu_live_broadcast_room()
-
-            # 当只输入了点赞数量，没选择执行任务时
-            if self.current_click_num:
-                self.total_click_num -= 1
-                self.start_thread(self.click_simulator_control)
-                self.start_button.Disable()
-                self.pause_resume_button.SetLabel("暂停")
-                self.pause_resume_button.Enable()
-                self.stop_button.Enable()
-            if self.checked:
-                self.click_date_start = datetime.now()
-                self.start_thread(self.click_task)
-                self.start_button.Disable()
-                self.pause_resume_button.SetLabel("暂停")
-                self.pause_resume_button.Enable()
-                self.stop_button.Enable()
-            if self.comment_checked:
-                self.start_thread(self.comment_control)
-                self.start_button.Disable()
-                self.pause_resume_button.SetLabel("暂停")
-                self.pause_resume_button.Enable()
-                self.stop_button.Enable()
+            # 等待进入直播间
+            if self.enter_live_broadcast_event.wait():
+                # 当只输入了点赞数量，没选择执行任务时
+                if self.current_click_num:
+                    self.total_click_num -= 1
+                    self.start_thread(self.click_simulator_control)
+                    self.start_button.Disable()
+                    self.pause_resume_button.SetLabel("暂停")
+                    self.pause_resume_button.Enable()
+                    self.stop_button.Enable()
+                if self.checked:
+                    self.click_date_start = datetime.now()
+                    self.start_thread(self.click_task)
+                    self.start_button.Disable()
+                    self.pause_resume_button.SetLabel("暂停")
+                    self.pause_resume_button.Enable()
+                    self.stop_button.Enable()
+                if self.comment_checked:
+                    self.start_thread(self.comment_control)
+                    self.start_button.Disable()
+                    self.pause_resume_button.SetLabel("暂停")
+                    self.pause_resume_button.Enable()
+                    self.stop_button.Enable()
+            else:
+                wx.CallAfter(self.on_task_completed, "直播间进入失败")
         else:
             wx.CallAfter(self.on_task_completed, "模拟器启动失败")
 
