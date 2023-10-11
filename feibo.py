@@ -681,8 +681,7 @@ class MyFrame(wx.Frame):
             # 异步调用开启模拟器
             asyncio.run(self.start_simulator())
             # 异步监听开启状态
-            listener_start_thread = functools.partial(self.listener_start_thread, self.selected_android_option_name)
-            threading.Thread(target=listener_start_thread).start()
+            threading.Thread(target=self.listener_start_thread,args=(self.selected_android_option_name,)).start()
         elif status == "starting":
             self.sb.SetStatusText('状态信息:启动中', 2)
         elif status == "started":
@@ -813,8 +812,7 @@ class MyFrame(wx.Frame):
             # 异步调用关闭模拟器
             asyncio.run(self.close_simulator())
             # 异步监听关闭状态
-            listener_stop_thread = functools.partial(self.listener_stop_thread, self.selected_android_option_name)
-            threading.Thread(target=listener_stop_thread).start()
+            threading.Thread(target=self.listener_stop_thread,args=(self.selected_android_option_name,)).start()
         elif status == 'unstarting':
             self.sb.SetStatusText('状态信息:关闭中', 2)
         elif status == 'unstarted':
@@ -888,13 +886,15 @@ class MyFrame(wx.Frame):
         """
         启动应用程序
         """
-        self.app = App_Program(self.panel, self.device.serial, self.Application_program_name)
+        app = App_Program(self.panel, self.device.serial, self.Application_program_name)
         # 启动atx-agent
-        await self.app.start_atx_agent()
+        await app.start_atx_agent()
         # 检查应用程序
-        await self.app.check_application_program()
+        await app.check_application_program()
         # 启动应用程序
-        await self.app.start_application_program()
+        await app.start_application_program()
+
+        return app
 
     def wait_device_full_start(self, timeout=30):
         """
@@ -916,7 +916,7 @@ class MyFrame(wx.Frame):
         logger.warning("设备启动超时")
         return False
 
-    def wait_device_start(self, timeout=30):
+    def wait_device_start(self, before_start_event, timeout=30):
         """
         等待模拟器启动
         :param timeout: 最大等待时间（秒）
@@ -937,9 +937,9 @@ class MyFrame(wx.Frame):
             device_status = self.wait_device_full_start()
             if device_status:
                 # 设置事件，通知主线程操作已完成
-                self.before_start_event.set()
+                before_start_event.set()
 
-    def before_start_control_check(self):
+    def before_start_control_check(self, before_start_event):
         """
         开始前准备工作
         :return:
@@ -968,7 +968,7 @@ class MyFrame(wx.Frame):
         # 防止未启动设备直接开始
         if self.devices_info.get(self.selected_android_option_name, {}).get("status") == "started":
             if not hasattr(self, "device"):
-                self.wait_device_start()
+                self.wait_device_start(before_start_event)
             else:
                 listen_stop_device = functools.partial(self.listen_stop_device, self.selected_android_option_name)
                 asyncio.run(listen_stop_device())
@@ -976,31 +976,31 @@ class MyFrame(wx.Frame):
                     device_status = self.wait_device_full_start()
                     if device_status:
                         # 设置事件，通知主线程操作已完成
-                        self.before_start_event.set()
+                        before_start_event.set()
                 else:
-                    self.wait_device_start()
+                    self.wait_device_start(before_start_event)
         else:
-            self.wait_device_start()
+            self.wait_device_start(before_start_event)
 
-    async def listen_before_start(self):
+    async def listen_before_start(self, before_start_event):
         """
-        监听开始前准备工作是否完成
+        监听开始前准备工作是否完成，如果完成启动app、进入直播间、开始点赞
         :return:
         """
         # 在主线程中等待开始前准备工作完成
-        if self.before_start_event.wait():
+        if before_start_event.wait():
             # 启动应用程序
-            await self.application_program_main()
+            app = await self.application_program_main()
             await asyncio.sleep(3)  # 给予app启动一定的加载时间
             # 进入直播间事件
-            self.enter_live_broadcast_event = threading.Event()
+            enter_live_broadcast_event = threading.Event()
             if self.Application_program_name == "抖音":
-                self.douyinroom = DouYinRoom(self.device, self.app_id, self.app, self.enter_live_broadcast_event)
+                self.douyinroom = DouYinRoom(self.device, self.app_id, app, enter_live_broadcast_event)
                 await self.douyinroom.enter_douyin_live_broadcast_room()
             else:  # 小红书
                 await self.enter_xiaohongshu_live_broadcast_room()
             # 等待进入直播间
-            if self.enter_live_broadcast_event.wait():
+            if enter_live_broadcast_event.wait():
                 # 当只输入了点赞数量，没选择执行任务时
                 if self.current_click_num:
                     self.total_click_num -= 1
@@ -1027,14 +1027,15 @@ class MyFrame(wx.Frame):
         else:
             wx.CallAfter(self.on_task_completed, "模拟器启动失败")
 
-    def listener_before_start_thread(self):
+    def listener_before_start_thread(self,before_start_event):
         """
         监听开始前准备工作线程
         :return:
         """
         start_loop = asyncio.new_event_loop()  # 创建独立的事件循环
         asyncio.set_event_loop(start_loop)  # 设置事件循环为当前线程的循环
-        start_loop.run_until_complete(self.process_concurrent(self.listen_before_start)) # run_until_complete：等待运行完毕
+        listen_before_start = functools.partial(self.listen_before_start,before_start_event)
+        start_loop.run_until_complete(self.process_concurrent(listen_before_start)) # run_until_complete：等待运行完毕
         start_loop.close()  # 关闭事件循环
 
     def start_control(self, evt):
@@ -1042,11 +1043,11 @@ class MyFrame(wx.Frame):
         开始控件
         """
         # 创建开始前准备工作事件对象
-        self.before_start_event = threading.Event()
+        before_start_event = threading.Event()
         # 开始前准备工作
-        threading.Thread(target=self.before_start_control_check).start()
+        threading.Thread(target=self.before_start_control_check,args=(before_start_event,)).start()
         # 异步监听准备状态
-        threading.Thread(target=self.listener_before_start_thread).start()
+        threading.Thread(target=self.listener_before_start_thread, args=(before_start_event,)).start()
 
     def click_simulator_control(self):
         """
