@@ -8,15 +8,16 @@ import subprocess
 import asyncio
 import aiohttp
 from lxml import html
-from threading import Thread
+from retrying import retry
+
 from logger import logger
 
 
 class App_Program:
-    def __init__(self, panel, serial, Application_program_name):
+    def __init__(self, panel, serial, application_program_name):
         self.panel = panel
         self.serial = serial
-        self.app_name = Application_program_name
+        self.app_name = application_program_name
 
         # 应用程序对应的来源地址和url
         application_package_name = {"抖音": {
@@ -34,6 +35,7 @@ class App_Program:
         self.status_label = wx.StaticText(self.panel, label="", pos=((220, 40)))
         logger.info(f"----------当前序列号：{serial}--------------------")
 
+    @retry(wait_fixed=10000, stop_max_attempt_number=3) # 错误等十秒，重试只三次
     async def request_latest_download_info(self):
         """
         请求最新的下载信息
@@ -44,16 +46,20 @@ class App_Program:
         }
         timeout = aiohttp.ClientTimeout(total=10)  # 设置超时时间为10秒
         conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
-        async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
-            async with session.get(self.url, headers=self.headers) as response:
-                if response.status == 200:
-                    data = await response.text()
-                    # 使用lxml解析页面内容
-                    tree = html.fromstring(data)
-                    version_element = tree.xpath('/html/body/div[3]/main/div[1]/div/span[3]/span')[0]
-                    version = version_element.text_content()
-                    download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
-                    return version, download_url
+        try:
+            async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
+                async with session.get(self.url, headers=self.headers) as response:
+                    if response.status == 200:
+                        data = await response.text()
+                        # 使用lxml解析页面内容
+                        tree = html.fromstring(data)
+                        version_element = tree.xpath('/html/body/div[3]/main/div[1]/div/span[3]/span')[0]
+                        version = version_element.text_content()
+                        download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
+                        return version, download_url
+        except aiohttp.ClientError as e:
+            logger.info(e)
+            return None, None
 
     async def check_application_version(self, timeout=30):
         """
@@ -78,7 +84,8 @@ class App_Program:
         logger.warning("获取应用程序版本号超时")
         return None
 
-    async def compare_version(self, version, local_version):
+    @staticmethod
+    async def compare_version(version, local_version):
         """
         比较版本大小
         :param version: 线上最新版本
@@ -131,7 +138,7 @@ class App_Program:
                         else:
                             wx.CallAfter(self.update_status, "卸载失败")
                         await self.start_download(version, download_url)
-                        await self.install_Application_Program(version)
+                        await self.install_application_program(version)
                     else:
                         logger.info("App版本通过！")
                 else:
@@ -144,16 +151,15 @@ class App_Program:
             logger.info(f"最新apk地址：{download_url}")
             if version and download_url:
                 await self.start_download(version, download_url)
-                await self.install_Application_Program(version)
+                await self.install_application_program(version)
             else:
                 logger.info("App最新版本和下载地址请求错误！")
 
     def download_file(self, url, file_name):
         """
         下载apk
-        :param url: apk下载地址
+        :param url: 安装包下载地址
         :param file_name: 文件名
-        :return:
         """
         with requests.get(url, headers=self.headers, stream=True) as response:
             total_length = int(response.headers.get('content-length'))
@@ -177,7 +183,6 @@ class App_Program:
         开始下载
         :param version: 版本号
         :param download_url: apk下载地址
-        :return:
         """
         file_name = f"{self.app_name}_{version}.apk"
         if not os.path.isfile(file_name):
@@ -196,16 +201,17 @@ class App_Program:
     def update_progress(self, progress):
         """
         更新进度条
-        :param progress:
+        :param progress: 进度条
         """
         self.progress.SetValue(int(progress * 100))
 
     def update_status(self, status):
         self.status_label.SetLabel(status)
 
-    async def install_Application_Program(self, version):
+    async def install_application_program(self, version):
         """
         安装应用程序
+        :param version: 版本 
         """
         cmd = f'adb -s {self.serial} install -r ./{self.app_name}_{version}.apk'
         logger.info(f"开始安装App：{cmd}")
@@ -230,7 +236,7 @@ class App_Program:
             logger.info("APP卸载失败")
         return uninstall_status
 
-    def get_Activity_name(self):
+    def get_activity_name(self):
         """获取启动Activity名称"""
         cmd = "adb -s {} shell dumpsys package {} | grep -A 1 'MAIN' | grep 'Activity' | awk '{{print $2}}'".format(
             self.serial, self.package_name)
@@ -286,7 +292,7 @@ class App_Program:
         """
         启动应用程序
         """
-        self.get_Activity_name()
+        self.get_activity_name()
         self.check_wifi_status()
 
         # 检查引用程序运行状态

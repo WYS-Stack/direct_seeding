@@ -13,7 +13,7 @@ class DouYinRoom:
         self.app = app_server
         self.enter_live_broadcast_event = enter_live_broadcast_event
 
-    async def enter_douyin_live_broadcast_room(self):
+    async def enter_live_broadcast_room(self):
         """
         进入抖音直播间的主函数
         """
@@ -66,7 +66,7 @@ class DouYinRoom:
                 logger.info("尝试重新进入中...")
                 self.force_flag = True
                 await self.app.force_restart_application_program()
-                await self.enter_douyin_live_broadcast_room()
+                await self.enter_live_broadcast_room()
 
     async def enter_home_page(self, d):
         """
@@ -91,13 +91,39 @@ class DouYinRoom:
         """
         进入账号信息页面
         """
-        if d(resourceId="com.ss.android.ugc.aweme:id/k_8").exists:
-            logger.info("确定当前为账号信息页面")
-            d.press("back")
-            await self.enter_douyin_live_broadcast_room()
+        logger.info("确定当前为账号信息页面")
+        if d(resourceId="com.ss.android.ugc.aweme:id/k_8").exists(): # 直播标识
+            d(resourceId="com.ss.android.ugc.aweme:id/vcj").click() # '···'按钮
+            id_flag = d(resourceId="com.ss.android.ugc.aweme:id/re+")
+            if id_flag.exists:
+                douyin_id = id_flag.get_text().split("抖音号: ")[1]  # 获取抖音账号
+                if douyin_id == self.app_id:
+                    d.press("back")
+                    # await self.enter_live_broadcast_page(d)
+                else:
+                    d.press("back")
+                    d.press("back")
+                    # 重新进入搜索页面来进入新的直播间
+                    await self.enter_search_page(d)
+            else:
+                logger.info("未直播（未找到账号信息）")
+                wx.CallAfter(self.on_task_completed, "未直播")
         else:
-            logger.info("未直播（未找到直播标志）")
-            wx.CallAfter(self.on_task_completed, "未直播")
+            d(resourceId="com.ss.android.ugc.aweme:id/vcj").click()  # '···'按钮
+            id_flag = d(resourceId="com.ss.android.ugc.aweme:id/re+")
+            if id_flag.exists:
+                douyin_id = id_flag.get_text().split("抖音号: ")[1]  # 获取抖音账号
+                if douyin_id == self.app_id:
+                    logger.info("未直播（未找到直播标志）")
+                    wx.CallAfter(self.on_task_completed, "未直播")
+                else:
+                    d.press("back")
+                    d.press("back")
+                    # 重新进入搜索页面来进入新的直播间
+                    await self.enter_search_page(d)
+            else:
+                logger.info("未直播（未找到账号信息）")
+                wx.CallAfter(self.on_task_completed, "未直播")
 
     async def enter_live_broadcast_page(self, d):
         """
@@ -132,12 +158,17 @@ class DouYinRoom:
             else:
                 logger.info("未搜索到账号直播信息")
                 wx.CallAfter(self.on_task_completed, "未搜索到账号直播信息")
+        elif d(resourceId="com.ss.android.ugc.aweme:id/o2z").click_exists():
+            enter_status = self.wait_full_enter_live_broadcast(d)
+            if enter_status:
+                logger.info("成功进入直播间")
+                self.enter_live_broadcast_event.set()
         else:
             logger.info("未查询到账号直播信息")
             wx.CallAfter(self.on_task_completed, "未查询到账号直播信息")
 
     @staticmethod
-    def wait_full_enter_live_broadcast(d, timeout=30):
+    def wait_full_enter_live_broadcast(d, timeout=10):
         """
         等待完全进入直播间
         :param d: 连接设备服务

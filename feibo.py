@@ -115,7 +115,8 @@ class MyFrame(wx.Frame):
 
         self.Bind(wx.EVT_TOOL, self.on_tool_click)  # 绑定工具按钮点击事件
 
-    def on_tool_click(self, event):
+    @staticmethod
+    def on_tool_click(event):
         tool_id = event.GetId()
 
         if tool_id == wx.ID_NEW:
@@ -153,15 +154,16 @@ class MyFrame(wx.Frame):
         """关于"""
         self.sb.SetStatusText(u'关于', 1)
 
-    def emulators_list(self):
+    @staticmethod
+    def emulators_list():
         """
         模拟器列表
         :return: 所有的模拟器
         """
         result = subprocess.run("/Users/wanghan/Library/Android/sdk/emulator/emulator -list-avds", shell=True,
                                 capture_output=True)
-        Android_list = result.stdout.decode().strip().split("\n")
-        return Android_list
+        android_list = result.stdout.decode().strip().split("\n")
+        return android_list
 
     def control_dynamic_loading(self):
         """初始化动态加载控件（扩展）"""
@@ -181,29 +183,29 @@ class MyFrame(wx.Frame):
         # 主界面
         wx.StaticText(parent=self.panel, label="请选择模拟器:", pos=(10, 10))
         wx.StaticText(parent=self.panel, label="请选择应用程序:", pos=(10, 40))
-        Application_program_list = ['抖音', '小红书']
+        application_program_list = ['抖音', '小红书']
         if not hasattr(self, "Android_choice"):
-            self.Application_program_choice = wx.Choice(self.panel, choices=Application_program_list, pos=(140, 40))
+            self.application_program_choice = wx.Choice(self.panel, choices=application_program_list, pos=(140, 40))
         else:
-            self.Application_program_choice.Set(Application_program_list)
-        self.choice_Application_program(None)
-        self.Application_program_choice.Bind(wx.EVT_CHOICE, self.choice_Application_program)
+            self.application_program_choice.Set(application_program_list)
+        self.choice_application_program(None)
+        self.application_program_choice.Bind(wx.EVT_CHOICE, self.choice_application_program)
         # 设置初始化焦点 在当前按钮上（可任意部件）
-        self.Application_program_choice.SetFocus()
+        self.application_program_choice.SetFocus()
 
         # 模拟器列表
-        Android_list = self.emulators_list()
+        android_list = self.emulators_list()
         if not hasattr(self, "Android_choice"):
-            self.Android_choice = wx.Choice(self.panel, choices=Android_list, pos=(140, 10))
+            self.Android_choice = wx.Choice(self.panel, choices=android_list, pos=(140, 10))
         else:
-            self.Android_choice.Set(Android_list)
+            self.Android_choice.Set(android_list)
         # 初始化下拉列表，并添加开启关闭控件
-        self.choice_Android_device(None)
-        self.Android_choice.Bind(wx.EVT_CHOICE, self.choice_Android_device)
+        self.choice_android_device(None)
+        self.Android_choice.Bind(wx.EVT_CHOICE, self.choice_android_device)
 
         # 初始化状态栏信息
-        if Android_list:
-            self.sb.SetStatusText(f'模拟器信息:{Android_list[0]}', 0)
+        if android_list:
+            self.sb.SetStatusText(f'模拟器信息:{android_list[0]}', 0)
             self.sb.SetStatusText('', 1)
             self.sb.SetStatusText('状态信息:未启动', 2)
 
@@ -248,8 +250,9 @@ class MyFrame(wx.Frame):
         self.pause_resume_button = wx.Button(parent=self.panel, label="暂停", pos=(370, 250), size=(100, -1))
         self.pause_resume_button.Bind(wx.EVT_BUTTON, self.on_pause_resume)
         self.pause_resume_button.Disable()
-
-    def read_history(self,filename):
+    
+    @staticmethod
+    def read_history(filename):
         """
         读取历史记录
         :param filename: 历史记录文件名
@@ -408,15 +411,16 @@ class MyFrame(wx.Frame):
             (self.app_id_text_ctrl.GetPosition().x, self.app_id_text_ctrl.GetPosition().y + self.app_id_text_ctrl.GetSize().GetHeight()))
         self.selected_index = -1
 
-    def start_thread(self, target):
+    def start_thread(self, target, device):
         """
         开始线程
-        :param target:
+        :param target: 点赞/评论任务
+        :param device: 需要操作的模拟器
         """
         if self.thread is None or not self.thread.is_alive():
             self.stop_flag.clear()
             self.pause_flag.clear()
-            self.thread = threading.Thread(target=target)
+            self.thread = threading.Thread(target=target,args=(device,))
             self.thread.start()
 
     def stop_thread(self):
@@ -444,10 +448,10 @@ class MyFrame(wx.Frame):
         # 当有模拟器启动时
         if len(self.devices) > 0:
             # 为当前线程创建独享的事件循环，避免多线程间的事件循环干扰
-            closeX_loop = asyncio.new_event_loop()  # 创建独立的事件循环
-            asyncio.set_event_loop(closeX_loop)  # 设置事件循环为当前线程的循环
-            closeX_loop.run_until_complete(self.create_close_simulator_task())  # 创建关闭模拟器的任务
-            closeX_loop.close()  # 关闭事件循环
+            closex_loop = asyncio.new_event_loop()  # 创建独立的事件循环
+            asyncio.set_event_loop(closex_loop)  # 设置事件循环为当前线程的循环
+            closex_loop.run_until_complete(self.create_close_simulator_task())  # 创建关闭模拟器的任务
+            closex_loop.close()  # 关闭事件循环
         evt.Skip()
 
     async def create_close_simulator_task(self):
@@ -471,19 +475,26 @@ class MyFrame(wx.Frame):
             return
         choice = wx.MessageBox('是否关闭', f'模拟器 {running_name} 已启动', wx.YES_NO | wx.ICON_QUESTION)
         if choice == wx.YES:
-            await self.close_simulator(device)
+            await self.close_simulator(device=device)
 
-    def choice_Android_device(self, event):
+    def get_choice_android_device_name(self):
         """
-        选择设备
+        获取选择设备的名称
         """
         # 获取选中设备的索引
         selected_index = self.Android_choice.GetSelection()
         # 获取选中设备的名称
-        self.selected_android_option_name = self.Android_choice.GetString(selected_index)
+        selected_android_option_name = self.Android_choice.GetString(selected_index)
+        return selected_android_option_name
+
+    def choice_android_device(self, event):
+        """
+        选择设备
+        """
+        selected_android_option_name = self.get_choice_android_device_name()
         # 开启关闭控件
-        status = self.check_selected_device_status(self.selected_android_option_name)
-        self.check_animation_status()
+        status = self.check_selected_device_status(selected_android_option_name)
+        self.check_animation_status(selected_android_option_name)
         # 已开启、关闭中（显关闭按钮）
         if status in ['started', 'unstarting']:
             self.switch_off_button()
@@ -491,16 +502,17 @@ class MyFrame(wx.Frame):
         else:
             self.switch_on_button()
 
-    def choice_Application_program(self, event):
+    def choice_application_program(self, event):
         """选择应用程序"""
         # 获取选中应用程序的索引
-        selected_index = self.Application_program_choice.GetSelection()
+        selected_index = self.application_program_choice.GetSelection()
         # 获取选中设备的名称
-        self.Application_program_name = self.Application_program_choice.GetString(selected_index)
+        self.Application_program_name = self.application_program_choice.GetString(selected_index)
 
     def check_device_connection(self, max_retries=3):
         """
         检测服务是否连接
+        :param max_retries: 最大重试次数
         """
         for attempt in range(max_retries):
             try:
@@ -523,7 +535,6 @@ class MyFrame(wx.Frame):
     def switch_on_button(self):
         """
         展示启动按钮
-        :return:
         """
         self.sb.SetStatusText('状态信息:未启动', 2)
         if hasattr(self, "Reconnect_button"):
@@ -535,7 +546,6 @@ class MyFrame(wx.Frame):
     def switch_off_button(self):
         """
         展示关闭按钮
-        :return:
         """
         self.sb.SetStatusText('状态信息:已启动', 2)
         if hasattr(self, "Reconnect_button"):
@@ -544,12 +554,11 @@ class MyFrame(wx.Frame):
             self.Reconnect_button = wx.Button(parent=self.panel, label="关闭", pos=(300, 10), size=(100, -1))
         self.Reconnect_button.Bind(wx.EVT_BUTTON, self.stop_device)
 
-    def check_animation_status(self):
+    def check_animation_status(self,selected_android_option_name):
         """动态加载状态"""
-        if self.selected_android_option_name in self.devices_info and self.devices_info[
-            self.selected_android_option_name]:
+        if selected_android_option_name in self.devices_info and self.devices_info[selected_android_option_name]:
             # 启动中、关闭中
-            if self.devices_info[self.selected_android_option_name]["status"] in ["starting", "unstarting"]:
+            if self.devices_info[selected_android_option_name]["status"] in ["starting", "unstarting"]:
                 self.animation.Show()
             # 已启动
             else:
@@ -570,21 +579,19 @@ class MyFrame(wx.Frame):
             # 已启动
             if status == "started":
                 # 已启动
-                self.device = self.devices_info[selected_android_option_name]["server"]
                 return "started"
             # 启动中
             elif status == "starting":
                 # 获取所有已启动设备的名称
-                running_Android_name = {}
+                running_android_name = {}
                 for index, device in enumerate(self.devices):
                     cmd = f'adb -s {device.serial} shell getprop ro.boot.qemu.avd_name'
                     running_name = subprocess.getoutput(cmd)
-                    running_Android_name[running_name] = index
+                    running_android_name[running_name] = index
                 # 已启动
-                if selected_android_option_name in running_Android_name:
-                    self.device = self.devices[running_Android_name[selected_android_option_name]]
+                if selected_android_option_name in running_android_name:
                     self.devices_info[selected_android_option_name]["server"] = self.devices[
-                        running_Android_name[selected_android_option_name]]
+                        running_android_name[selected_android_option_name]]
                     self.devices_info[selected_android_option_name]["status"] = "started"
                     return "started"
                 # 启动中
@@ -596,26 +603,25 @@ class MyFrame(wx.Frame):
         else:
             try:
                 # 获取所有已启动设备的名称
-                running_Android_name = {}
+                running_android_name = {}
                 for index, device in enumerate(self.devices):
                     cmd = f'adb -s {device.serial} shell getprop ro.boot.qemu.avd_name'
                     running_name = subprocess.getoutput(cmd)
-                    running_Android_name[running_name] = index
+                    running_android_name[running_name] = index
 
                 # 下拉框选择的设备已开启
                 self.devices_info[selected_android_option_name] = {}
-                if selected_android_option_name in running_Android_name:
+                if selected_android_option_name in running_android_name:
                     # 经检测已启动
-                    self.device = self.devices[running_Android_name[selected_android_option_name]]
                     self.devices_info[selected_android_option_name]["server"] = self.devices[
-                        running_Android_name[selected_android_option_name]]
+                        running_android_name[selected_android_option_name]]
                     self.devices_info[selected_android_option_name]["status"] = "started"
                     return "started"
                 else:
                     # 未启动
                     self.devices_info[selected_android_option_name]["status"] = "unstarted"
                     return "unstarted"
-            except:
+            except (subprocess.CalledProcessError, KeyError) as e:
                 import traceback
                 logger.info(traceback.format_exc())
                 return "unstarted"
@@ -651,7 +657,8 @@ class MyFrame(wx.Frame):
                 self.switch_on_button()
                 break
 
-    async def process_concurrent(self, func):
+    @staticmethod
+    async def process_concurrent(func):
         """
         使用asyncio.gather实现协程并发
         """
@@ -671,17 +678,18 @@ class MyFrame(wx.Frame):
     def start_device(self, event):
         """
         未检测到启动设备时，启动对应的安卓模拟器
-        :return:
         """
-        status = self.check_selected_device_status(self.selected_android_option_name)
+        selected_android_option_name = self.get_choice_android_device_name()
+        status = self.check_selected_device_status(selected_android_option_name)
         # 未启动
         if status == "unstarted":
             self.animation.Show()
             self.sb.SetStatusText('状态信息:启动中', 2)
             # 异步调用开启模拟器
-            asyncio.run(self.start_simulator())
+            start_simulator = functools.partial(self.start_simulator,selected_android_option_name)
+            asyncio.run(start_simulator())
             # 异步监听开启状态
-            threading.Thread(target=self.listener_start_thread,args=(self.selected_android_option_name,)).start()
+            threading.Thread(target=self.listener_start_thread,args=(selected_android_option_name,)).start()
         elif status == "starting":
             self.sb.SetStatusText('状态信息:启动中', 2)
         elif status == "started":
@@ -694,15 +702,12 @@ class MyFrame(wx.Frame):
             self.sb.SetStatusText('状态信息:关闭中', 2)
             self.switch_on_button()
 
-    async def start_simulator(self):
+    async def start_simulator(self,selected_android_option_name):
         """
         开启安卓模拟器
-        :return:
         """
-        if not hasattr(self, "selected_android_option_name"):
-            self.choice_Android_device(None)
         await asyncio.create_subprocess_shell(
-            f'/Users/wanghan/Library/Android/sdk/emulator/emulator -avd {self.selected_android_option_name}',
+            f'/Users/wanghan/Library/Android/sdk/emulator/emulator -avd {selected_android_option_name}',
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -721,10 +726,11 @@ class MyFrame(wx.Frame):
                 return "unstarted"
             # 关闭中
             elif status == "unstarting":
-                cmd = f'adb -s {self.device.serial} devices'
+                device = self.devices_info[selected_android_option_name]["server"]
+                cmd = f'adb -s {device.serial} devices'
                 output = subprocess.getoutput(cmd)
                 # 关闭中
-                if self.device.serial in output:
+                if device.serial in output:
                     return "unstarting"
                 # 未启动
                 else:
@@ -732,17 +738,19 @@ class MyFrame(wx.Frame):
                     return "unstarted"
             # 已启动、启动中
             else:
-                cmd = f'adb -s {self.device.serial} devices'
+                device = self.devices_info[selected_android_option_name]["server"]
+                cmd = f'adb -s {device.serial} devices'
                 output = subprocess.getoutput(cmd)
-                if self.device.serial not in output:
+                if device.serial not in output:
                     del self.devices_info[selected_android_option_name]
                     return "unstarted"
                 return status
         else:
+            device = self.devices_info[selected_android_option_name]["server"]
             # 通过判断adb服务是否有这个安卓模拟器来决定是否已完全关闭
-            cmd = f'adb -s {self.device.serial} devices'
+            cmd = f'adb -s {device.serial} devices'
             output = subprocess.getoutput(cmd)
-            if self.device.serial in output:
+            if device.serial in output:
                 return "started"
             else:
                 # 未启动
@@ -753,7 +761,7 @@ class MyFrame(wx.Frame):
     async def listen_stop_device(self, selected_android_option_name):
         """
         异步监听安卓模拟器是否已完全关闭
-        :return:
+        :param selected_android_option_name: 选中的安卓模拟器名称
         """
         while True:
             # 检查关闭模拟器指令是否成功执行
@@ -789,7 +797,7 @@ class MyFrame(wx.Frame):
     def listener_stop_thread(self, selected_android_option_name):
         """
         启用关闭监听线程
-        :return:
+        :param selected_android_option_name: 选中的安卓模拟器名称
         """
         # 为当前线程创建独享的事件循环，避免多线程间的事件循环干扰
         stop_loop = asyncio.new_event_loop()  # 创建独立的事件循环
@@ -801,18 +809,17 @@ class MyFrame(wx.Frame):
     def stop_device(self, event):
         """
         关闭按钮
-        :param event:
-        :return:
         """
+        selected_android_option_name = self.get_choice_android_device_name()
         # 关闭前检查是否在开启状态
-        status = self.check_device_in_adb_devices(self.selected_android_option_name)
+        status = self.check_device_in_adb_devices(selected_android_option_name)
         if status == 'started':
             self.animation.Show()
             self.sb.SetStatusText('状态信息:关闭中', 2)
             # 异步调用关闭模拟器
-            asyncio.run(self.close_simulator())
+            asyncio.run(self.close_simulator(selected_android_option_name=selected_android_option_name))
             # 异步监听关闭状态
-            threading.Thread(target=self.listener_stop_thread,args=(self.selected_android_option_name,)).start()
+            threading.Thread(target=self.listener_stop_thread, args=(selected_android_option_name,)).start()
         elif status == 'unstarting':
             self.sb.SetStatusText('状态信息:关闭中', 2)
         elif status == 'unstarted':
@@ -824,13 +831,13 @@ class MyFrame(wx.Frame):
             self.sb.SetStatusText('状态信息:开启中', 2)
             self.switch_off_button()
 
-    async def close_simulator(self, device=None):
+    async def close_simulator(self, device=None,selected_android_option_name=None):
         """
         关闭安卓模拟器
         :return:
         """
         if not device:
-            device = self.device
+            device = self.devices_info[selected_android_option_name]["server"]
         process = await asyncio.create_subprocess_shell(
             f'adb -s {device.serial} emu kill',
             stdout=subprocess.DEVNULL,
@@ -844,10 +851,11 @@ class MyFrame(wx.Frame):
         :param event:
         """
         self.new_frame = Click_ConfigFrame(None)
-        self.new_frame.Bind(wx.EVT_CLOSE, self.on_close_clickconfigframe)
+        self.new_frame.Bind(wx.EVT_CLOSE, self.on_close_click_config_frame)
         self.new_frame.Show()
 
-    def open_comment_config(self, evt):
+    @staticmethod
+    def open_comment_config(evt):
         """
         打开评论配置面板
         """
@@ -856,11 +864,10 @@ class MyFrame(wx.Frame):
         ex.show()
         app.exec_()
 
-    def on_close_clickconfigframe(self, evt):
+    def on_close_click_config_frame(self, evt):
         """
         关闭窗口
         :param evt: 当前窗口
-        :return:
         """
         # 获取配置的值
         self.new_frame.on_get_values(None)
@@ -882,13 +889,15 @@ class MyFrame(wx.Frame):
         """
         pass
 
-    async def application_program_main(self):
+    async def application_program_main(self, device):
         """
         启动应用程序
+        :param device: 模拟器服务
         """
-        app = App_Program(self.panel, self.device.serial, self.Application_program_name)
+        app = App_Program(self.panel, device.serial, self.Application_program_name)
         # 启动atx-agent
         await app.start_atx_agent()
+        await asyncio.sleep(3)
         # 检查应用程序
         await app.check_application_program()
         # 启动应用程序
@@ -896,13 +905,15 @@ class MyFrame(wx.Frame):
 
         return app
 
-    def wait_device_full_start(self, timeout=30):
+    @staticmethod
+    def wait_device_full_start(device, timeout=30):
         """
         等待模拟器完全启动
+        :param device: 模拟器服务
         :param timeout: 最大等待时间（秒）
         :return: 是否成功
         """
-        cmd = f'adb -s {self.device.serial} shell getprop sys.boot_completed'
+        cmd = f'adb -s {device.serial} shell getprop sys.boot_completed'
         start_time = time.time()
 
         while time.time() - start_time < timeout:
@@ -916,11 +927,12 @@ class MyFrame(wx.Frame):
         logger.warning("设备启动超时")
         return False
 
-    def wait_device_start(self, before_start_event, timeout=30):
+    def wait_device_start(self, before_start_event, selected_android_option_name, timeout=30):
         """
         等待模拟器启动
+        :param before_start_event: 开始前事件
+        :param selected_android_option_name: 选中的安卓模拟器名称
         :param timeout: 最大等待时间（秒）
-        :return:
         """
         choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
         start_time = time.time()
@@ -929,20 +941,22 @@ class MyFrame(wx.Frame):
             self.start_device(None)
 
             while time.time() - start_time < timeout:
-                if hasattr(self, "device"):
+                if self.devices_info.get(selected_android_option_name).get("server"):
                     break
                 logger.info("等待启动中...")
                 time.sleep(1)
 
-            device_status = self.wait_device_full_start()
+            device = self.devices_info[selected_android_option_name]["server"]
+            device_status = self.wait_device_full_start(device)
             if device_status:
                 # 设置事件，通知主线程操作已完成
                 before_start_event.set()
 
-    def before_start_control_check(self, before_start_event):
+    def before_start_control_check(self, before_start_event, selected_android_option_name):
         """
         开始前准备工作
-        :return:
+        :param before_start_event: 开始前事件
+        :param selected_android_option_name: 选中的安卓模拟器名称
         """
         self.app_id = self.app_id_text_ctrl.GetValue()
         if not self.app_id:
@@ -966,58 +980,60 @@ class MyFrame(wx.Frame):
             wx.MessageBox('点赞数量要大于0', '提示', wx.OK | wx.ICON_INFORMATION)
 
         # 防止未启动设备直接开始
-        if self.devices_info.get(self.selected_android_option_name, {}).get("status") == "started":
-            if not hasattr(self, "device"):
-                self.wait_device_start(before_start_event)
+        if self.devices_info.get(selected_android_option_name, {}).get("status") == "started":
+            if not self.devices_info[selected_android_option_name].get("server"):
+                self.wait_device_start(before_start_event, selected_android_option_name)
             else:
-                listen_stop_device = functools.partial(self.listen_stop_device, self.selected_android_option_name)
-                asyncio.run(listen_stop_device())
-                if self.devices_info.get(self.selected_android_option_name):
-                    device_status = self.wait_device_full_start()
+                self.check_device_in_adb_devices(selected_android_option_name)
+                if self.devices_info.get(selected_android_option_name):
+                    device = self.devices_info[selected_android_option_name]["server"]
+                    device_status = self.wait_device_full_start(device)
                     if device_status:
                         # 设置事件，通知主线程操作已完成
                         before_start_event.set()
                 else:
-                    self.wait_device_start(before_start_event)
+                    self.wait_device_start(before_start_event, selected_android_option_name)
         else:
-            self.wait_device_start(before_start_event)
+            self.wait_device_start(before_start_event, selected_android_option_name)
 
-    async def listen_before_start(self, before_start_event):
+    async def listen_before_start(self, before_start_event, selected_android_option_name):
         """
         监听开始前准备工作是否完成，如果完成启动app、进入直播间、开始点赞
-        :return:
+        :param before_start_event: 开始前事件
+        :param selected_android_option_name: 选中的安卓模拟器名称
         """
         # 在主线程中等待开始前准备工作完成
-        if before_start_event.wait():
+        if before_start_event.wait(timeout=60):
+            device = self.devices_info[selected_android_option_name]["server"]
             # 启动应用程序
-            app = await self.application_program_main()
+            app = await self.application_program_main(device)
             await asyncio.sleep(3)  # 给予app启动一定的加载时间
             # 进入直播间事件
             enter_live_broadcast_event = threading.Event()
             if self.Application_program_name == "抖音":
-                self.douyinroom = DouYinRoom(self.device, self.app_id, app, enter_live_broadcast_event)
-                await self.douyinroom.enter_douyin_live_broadcast_room()
+                douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event)
+                await douyin.enter_live_broadcast_room()
             else:  # 小红书
                 await self.enter_xiaohongshu_live_broadcast_room()
             # 等待进入直播间
-            if enter_live_broadcast_event.wait():
+            if enter_live_broadcast_event.wait(timeout=3):
                 # 当只输入了点赞数量，没选择执行任务时
                 if self.current_click_num:
                     self.total_click_num -= 1
-                    self.start_thread(self.click_simulator_control)
+                    self.start_thread(self.click_simulator_control, device)
                     self.start_button.Disable()
                     self.pause_resume_button.SetLabel("暂停")
                     self.pause_resume_button.Enable()
                     self.stop_button.Enable()
                 if self.checked:
                     self.click_date_start = datetime.now()
-                    self.start_thread(self.click_task)
+                    self.start_thread(self.click_task, device)
                     self.start_button.Disable()
                     self.pause_resume_button.SetLabel("暂停")
                     self.pause_resume_button.Enable()
                     self.stop_button.Enable()
                 if self.comment_checked:
-                    self.start_thread(self.comment_control)
+                    self.start_thread(self.comment_control, device)
                     self.start_button.Disable()
                     self.pause_resume_button.SetLabel("暂停")
                     self.pause_resume_button.Enable()
@@ -1027,29 +1043,32 @@ class MyFrame(wx.Frame):
         else:
             wx.CallAfter(self.on_task_completed, "模拟器启动失败")
 
-    def listener_before_start_thread(self,before_start_event):
+    def listener_before_start_thread(self,before_start_event, selected_android_option_name):
         """
         监听开始前准备工作线程
-        :return:
+        :param before_start_event: 开始前事件
+        :param selected_android_option_name: 选中的安卓模拟器名称
         """
         start_loop = asyncio.new_event_loop()  # 创建独立的事件循环
         asyncio.set_event_loop(start_loop)  # 设置事件循环为当前线程的循环
-        listen_before_start = functools.partial(self.listen_before_start,before_start_event)
-        start_loop.run_until_complete(self.process_concurrent(listen_before_start)) # run_until_complete：等待运行完毕
+        listen_before_start = functools.partial(self.listen_before_start, before_start_event,
+                                                selected_android_option_name)
+        start_loop.run_until_complete(self.process_concurrent(listen_before_start))  # run_until_complete：等待运行完毕
         start_loop.close()  # 关闭事件循环
 
     def start_control(self, evt):
         """
         开始控件
         """
+        selected_android_option_name = self.get_choice_android_device_name()
         # 创建开始前准备工作事件对象
         before_start_event = threading.Event()
         # 开始前准备工作
-        threading.Thread(target=self.before_start_control_check,args=(before_start_event,)).start()
+        threading.Thread(target=self.before_start_control_check,args=(before_start_event, selected_android_option_name)).start()
         # 异步监听准备状态
-        threading.Thread(target=self.listener_before_start_thread, args=(before_start_event,)).start()
+        threading.Thread(target=self.listener_before_start_thread, args=(before_start_event, selected_android_option_name)).start()
 
-    def click_simulator_control(self):
+    def click_simulator_control(self, device):
         """
         点赞开始后的准备事项
             更新累积点赞次数
@@ -1061,11 +1080,11 @@ class MyFrame(wx.Frame):
         total_likes = 0
         self.batch_value += 1
         for i in range(self.current_click_num + 1):
-            if hasattr(self, "globle_click_num"):
-                self.globle_click_num += 1
+            if hasattr(self, "global_click_num"):
+                self.global_click_num += 1
             total_likes += 1
             # 异步调用开始点赞，并传递参数total_likes
-            wx.CallAfter(self.click_simulator, total_likes)
+            wx.CallAfter(self.click_simulator, total_likes, device)
             if self.stop_flag.is_set():
                 break
             while self.pause_flag.is_set():
@@ -1103,7 +1122,7 @@ class MyFrame(wx.Frame):
             self.pause_resume_button.Disable()
             self.start_button.Enable()
 
-    def click_task(self):
+    def click_task(self, device):
         """
         直播点赞任务控件
         :return:
@@ -1116,17 +1135,17 @@ class MyFrame(wx.Frame):
             click_time_total = int(config_value[2]) * 60  # 换算分钟为秒数
             click_batch_total = int(config_value[3])  # 点赞批数
             self.config_value = config_value  # 用于记录点赞任务最后是执行完最后一次，来开启"开始"禁用"暂停/继续"按钮
-            self.globle_click_num = 0
+            self.global_click_num = 0
             for index, value in enumerate(range(click_batch_total)):
                 # 计算本次需要点赞的数量
                 if index < click_batch_total - 1:
                     self.current_click_num = round(click_num_total / click_batch_total)
                     self.total_click_num -= 1
                 else:
-                    self.current_click_num = click_num_total - self.globle_click_num
+                    self.current_click_num = click_num_total - self.global_click_num
                     self.total_click_num -= 1
                 # 开始点赞
-                self.click_simulator_control()
+                self.click_simulator_control(device)
                 # 点赞结束后，需要冷却时间
                 click_date_end = datetime.now()
                 # TODO 正式环境打开
@@ -1144,15 +1163,15 @@ class MyFrame(wx.Frame):
                         self.wait_event.clear()  # 重置事件状态
                 self.click_date_start = click_date_end
 
-    def click_simulator(self, total_likes):
+    def click_simulator(self, total_likes, device):
         """
-        开始点赞
-            模拟器内部的鼠标点击
-        :param total_likes:
+        开始点赞（模拟器内部的鼠标点击）
+        :param total_likes: 当前任务总点赞次数
+        :param device: 模拟器服务
         :return:
         """
         # 模拟点击屏幕上的点(302, 534)
-        result = self.device.shell(f'input tap {self.click_X} {self.click_Y}')
+        result = device.shell(f'input tap {self.click_X} {self.click_Y}')
         # 成功
         if result == "":
             self.total_click_num += 1
@@ -1177,8 +1196,6 @@ class MyFrame(wx.Frame):
             1.停止线程——点赞
             2.显示开始按钮
             3.禁用取消/暂停按钮
-        :param evt:
-        :return:
         """
         self.stop_thread()
         self.start_button.Enable()
@@ -1189,8 +1206,6 @@ class MyFrame(wx.Frame):
     def on_pause_resume(self, evt):
         """
         暂停/继续按钮
-        :param evt:
-        :return:
         """
         if self.pause_flag.is_set():
             self.pause_flag.clear()
@@ -1202,7 +1217,7 @@ class MyFrame(wx.Frame):
     def read_config(self):
         """
         读取点赞任务的配置文件
-        :return:
+        :return: 文件默认数据
         """
         config_read = configparser.ConfigParser()
         config_read.read('config.ini')
@@ -1216,12 +1231,11 @@ class MyFrame(wx.Frame):
             default_values.append((num, interval, time, batch))
         return default_values
 
-    def comment_control(self):
+    def comment_control(self, device):
         """
         评论控件
-        :return:
         """
-        d = u2.connect(f"{self.device.serial}")
+        d = u2.connect(f"{device.serial}")
         # 输入评论
         d(resourceId="com.ss.android.ugc.aweme:id/f32").click()
         d.send_keys("1", clear=True)
