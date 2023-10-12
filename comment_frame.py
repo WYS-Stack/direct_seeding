@@ -1,7 +1,11 @@
+import os
+
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import *
 import openpyxl
 from PyQt5.QtCore import Qt, QEvent
+
+current_dir = os.path.dirname(__file__)
 
 
 class CommentWindow(QMainWindow):
@@ -263,7 +267,7 @@ class CommentWindow(QMainWindow):
         :param sheet_name: 要加载的Excel工作表的名称
         :param table_widget: 要填充数据的Qt表格部件
         """
-        excel_file = "config/comment_data.xlsx"
+        excel_file = os.path.join(current_dir, 'config', 'comment_data.xlsx')
         # 加载Excel数据
         wb = openpyxl.load_workbook(excel_file)
         # 选择指定的工作表

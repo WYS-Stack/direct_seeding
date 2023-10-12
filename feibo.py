@@ -1,6 +1,7 @@
 import asyncio
 import configparser
 import functools
+import os
 import subprocess
 import threading
 import time
@@ -18,6 +19,8 @@ from douyin_room import DouYinRoom
 from logger import logger
 from application_program import App_Program
 from comment_frame import CommentWindow
+
+current_dir = os.path.dirname(__file__)
 
 
 # 自定义窗口类MyFrame
@@ -53,7 +56,8 @@ class MyFrame(wx.Frame):
         # 历史记录面板
         self.history_popup = None
         # 历史记录文件
-        self.history_filename = 'config/history.txt'
+        history_filename = os.path.join(current_dir, 'config', 'history.txt')
+        self.history_filename = history_filename
         # 历史记录
         self.history_list = self.read_history(self.history_filename)
 
@@ -168,7 +172,8 @@ class MyFrame(wx.Frame):
     def control_dynamic_loading(self):
         """初始化动态加载控件（扩展）"""
         self.animation = wx.adv.AnimationCtrl(self.panel)
-        self.animation.LoadFile("img/Spinner-1s-30px.gif")
+        loading_path = os.path.join(current_dir, 'img', 'Spinner-1s-30px.gif')
+        self.animation.LoadFile(loading_path)
         self.animation.SetPosition((400, 6))
         self.animation.Play()
         self.animation.Hide()
@@ -411,16 +416,17 @@ class MyFrame(wx.Frame):
             (self.app_id_text_ctrl.GetPosition().x, self.app_id_text_ctrl.GetPosition().y + self.app_id_text_ctrl.GetSize().GetHeight()))
         self.selected_index = -1
 
-    def start_thread(self, target, device):
+    def start_thread(self, target, device, selected_android_option_name):
         """
         开始线程
         :param target: 点赞/评论任务
         :param device: 需要操作的模拟器
+        :param selected_android_option_name: 当前模拟器
         """
         if self.thread is None or not self.thread.is_alive():
             self.stop_flag.clear()
             self.pause_flag.clear()
-            self.thread = threading.Thread(target=target,args=(device,))
+            self.thread = threading.Thread(target=target, args=(device, selected_android_option_name))
             self.thread.start()
 
     def stop_thread(self):
@@ -905,14 +911,15 @@ class MyFrame(wx.Frame):
 
         return app
 
-    @staticmethod
-    def wait_device_full_start(device, timeout=30):
+    def wait_device_full_start(self, device, selected_android_option_name, timeout=30):
         """
         等待模拟器完全启动
+        :param selected_android_option_name: 当前模拟器名称
         :param device: 模拟器服务
         :param timeout: 最大等待时间（秒）
         :return: 是否成功
         """
+        self.devices_info[selected_android_option_name]["task_status"] = "reject"
         cmd = f'adb -s {device.serial} shell getprop sys.boot_completed'
         start_time = time.time()
 
@@ -927,16 +934,16 @@ class MyFrame(wx.Frame):
         logger.warning("设备启动超时")
         return False
 
-    def wait_device_start(self, before_start_event, selected_android_option_name, timeout=30):
+    def wait_device_start(self, selected_android_option_name, timeout=30):
         """
         等待模拟器启动
-        :param before_start_event: 开始前事件
         :param selected_android_option_name: 选中的安卓模拟器名称
         :param timeout: 最大等待时间（秒）
         """
         choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
         start_time = time.time()
         if choice == wx.YES:
+            self.devices_info[selected_android_option_name]["task_status"] = "reject"
             # 启动
             self.start_device(None)
 
@@ -947,128 +954,124 @@ class MyFrame(wx.Frame):
                 time.sleep(1)
 
             device = self.devices_info[selected_android_option_name]["server"]
-            device_status = self.wait_device_full_start(device)
+            device_status = self.wait_device_full_start(device,selected_android_option_name)
             if device_status:
-                # 设置事件，通知主线程操作已完成
-                before_start_event.set()
+                self.before_start_control(selected_android_option_name)
+        else:
+            self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
-    def before_start_control_check(self, before_start_event, selected_android_option_name):
+    def before_start_control_check(self):
         """
         开始前准备工作
-        :param before_start_event: 开始前事件
-        :param selected_android_option_name: 选中的安卓模拟器名称
         """
+        selected_android_option_name = self.get_choice_android_device_name()
         self.app_id = self.app_id_text_ctrl.GetValue()
+        self.current_click_num = int(self.input_click_text_ctrl.GetValue() or 0)
+        self.checked = self.confirm_click_checkbox.GetValue()
+        self.comment_checked = self.confirm_comment_checkbox.GetValue()
+
         if not self.app_id:
             wx.MessageBox("用户ID不能为空！", "提示")
             return
 
         # 获取手动点赞框输入的点赞数量
-        self.current_click_num = "" if not self.input_click_text_ctrl.GetValue() else int(
-            self.input_click_text_ctrl.GetValue())
-
-        # 获取直播点赞任务复选框状态
-        self.checked = self.confirm_click_checkbox.GetValue()
-
-        # 直播评论任务状态
-        self.comment_checked = self.confirm_comment_checkbox.GetValue()
-
         if not self.current_click_num and not self.checked and not self.comment_checked:
             wx.MessageBox('1.请输入点赞次数\n2.选中点赞任务\n3.选择评论任务', '提示', wx.OK | wx.ICON_INFORMATION)
             return
         elif self.current_click_num <= 0:
             wx.MessageBox('点赞数量要大于0', '提示', wx.OK | wx.ICON_INFORMATION)
+            return
+
+        task_status = self.devices_info.get(selected_android_option_name, {}).get('task_status')
+
+        if not task_status:
+            task_status = "accept"
+            self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
         # 防止未启动设备直接开始
         if self.devices_info.get(selected_android_option_name, {}).get("status") == "started":
             if not self.devices_info[selected_android_option_name].get("server"):
-                self.wait_device_start(before_start_event, selected_android_option_name)
+                if task_status == "accept":
+                    self.wait_device_start(selected_android_option_name)
             else:
+                # 避免人为关闭模拟器
                 self.check_device_in_adb_devices(selected_android_option_name)
                 if self.devices_info.get(selected_android_option_name):
                     device = self.devices_info[selected_android_option_name]["server"]
-                    device_status = self.wait_device_full_start(device)
-                    if device_status:
-                        # 设置事件，通知主线程操作已完成
-                        before_start_event.set()
+                    if task_status == "accept":
+                        device_status = self.wait_device_full_start(device,selected_android_option_name)
+                        if device_status:
+                            self.before_start_control(selected_android_option_name)
                 else:
-                    self.wait_device_start(before_start_event, selected_android_option_name)
+                    if task_status == "accept":
+                        self.wait_device_start(selected_android_option_name)
         else:
-            self.wait_device_start(before_start_event, selected_android_option_name)
+            if task_status == "accept":
+                self.wait_device_start(selected_android_option_name)
 
-    async def listen_before_start(self, before_start_event, selected_android_option_name):
+    async def before_start(self, selected_android_option_name):
         """
-        监听开始前准备工作是否完成，如果完成启动app、进入直播间、开始点赞
-        :param before_start_event: 开始前事件
+        完成启动app、进入直播间、开始点赞
         :param selected_android_option_name: 选中的安卓模拟器名称
         """
         # 在主线程中等待开始前准备工作完成
-        if before_start_event.wait(timeout=60):
-            device = self.devices_info[selected_android_option_name]["server"]
-            # 启动应用程序
-            app = await self.application_program_main(device)
-            await asyncio.sleep(3)  # 给予app启动一定的加载时间
-            # 进入直播间事件
-            enter_live_broadcast_event = threading.Event()
-            if self.Application_program_name == "抖音":
-                douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event)
-                await douyin.enter_live_broadcast_room()
-            else:  # 小红书
-                await self.enter_xiaohongshu_live_broadcast_room()
-            # 等待进入直播间
-            if enter_live_broadcast_event.wait(timeout=3):
-                # 当只输入了点赞数量，没选择执行任务时
-                if self.current_click_num:
-                    self.total_click_num -= 1
-                    self.start_thread(self.click_simulator_control, device)
-                    self.start_button.Disable()
-                    self.pause_resume_button.SetLabel("暂停")
-                    self.pause_resume_button.Enable()
-                    self.stop_button.Enable()
-                if self.checked:
-                    self.click_date_start = datetime.now()
-                    self.start_thread(self.click_task, device)
-                    self.start_button.Disable()
-                    self.pause_resume_button.SetLabel("暂停")
-                    self.pause_resume_button.Enable()
-                    self.stop_button.Enable()
-                if self.comment_checked:
-                    self.start_thread(self.comment_control, device)
-                    self.start_button.Disable()
-                    self.pause_resume_button.SetLabel("暂停")
-                    self.pause_resume_button.Enable()
-                    self.stop_button.Enable()
-            else:
-                wx.CallAfter(self.on_task_completed, "直播间进入失败")
+        device = self.devices_info[selected_android_option_name]["server"]
+        # 启动应用程序
+        app = await self.application_program_main(device)
+        await asyncio.sleep(3)  # 给予app启动一定的加载时间
+        # 进入直播间事件
+        enter_live_broadcast_event = threading.Event()
+        if self.Application_program_name == "抖音":
+            douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event)
+            await douyin.enter_live_broadcast_room()
+        else:  # 小红书
+            await self.enter_xiaohongshu_live_broadcast_room()
+        # 等待进入直播间
+        if enter_live_broadcast_event.wait(timeout=3):
+            # 当只输入了点赞数量，没选择执行任务时
+            if self.current_click_num:
+                self.total_click_num -= 1
+                self.start_thread(self.click_simulator_control, device, selected_android_option_name)
+                self.start_button.Disable()
+                self.pause_resume_button.SetLabel("暂停")
+                self.pause_resume_button.Enable()
+                self.stop_button.Enable()
+            if self.checked:
+                self.click_date_start = datetime.now()
+                self.start_thread(self.click_task, device, selected_android_option_name)
+                self.start_button.Disable()
+                self.pause_resume_button.SetLabel("暂停")
+                self.pause_resume_button.Enable()
+                self.stop_button.Enable()
+            if self.comment_checked:
+                self.start_thread(self.comment_control, device, selected_android_option_name)
+                self.start_button.Disable()
+                self.pause_resume_button.SetLabel("暂停")
+                self.pause_resume_button.Enable()
+                self.stop_button.Enable()
         else:
-            wx.CallAfter(self.on_task_completed, "模拟器启动失败")
+            self.devices_info[selected_android_option_name]['task_status'] = 'accept'
+            wx.CallAfter(self.on_task_completed, "直播间进入失败")
 
-    def listener_before_start_thread(self,before_start_event, selected_android_option_name):
+    def before_start_control(self, selected_android_option_name):
         """
-        监听开始前准备工作线程
-        :param before_start_event: 开始前事件
+        开始前准备工作线程
         :param selected_android_option_name: 选中的安卓模拟器名称
         """
         start_loop = asyncio.new_event_loop()  # 创建独立的事件循环
         asyncio.set_event_loop(start_loop)  # 设置事件循环为当前线程的循环
-        listen_before_start = functools.partial(self.listen_before_start, before_start_event,
-                                                selected_android_option_name)
-        start_loop.run_until_complete(self.process_concurrent(listen_before_start))  # run_until_complete：等待运行完毕
+        before_start = functools.partial(self.before_start, selected_android_option_name)
+        start_loop.run_until_complete(self.process_concurrent(before_start))  # run_until_complete：等待运行完毕
         start_loop.close()  # 关闭事件循环
 
     def start_control(self, evt):
         """
         开始控件
         """
-        selected_android_option_name = self.get_choice_android_device_name()
-        # 创建开始前准备工作事件对象
-        before_start_event = threading.Event()
         # 开始前准备工作
-        threading.Thread(target=self.before_start_control_check,args=(before_start_event, selected_android_option_name)).start()
-        # 异步监听准备状态
-        threading.Thread(target=self.listener_before_start_thread, args=(before_start_event, selected_android_option_name)).start()
+        threading.Thread(target=self.before_start_control_check).start()
 
-    def click_simulator_control(self, device):
+    def click_simulator_control(self, device, selected_android_option_name):
         """
         点赞开始后的准备事项
             更新累积点赞次数
@@ -1095,20 +1098,20 @@ class MyFrame(wx.Frame):
 
         # 判断此次点赞任务是否完成
         if total_likes - 1 == self.current_click_num:
-            if hasattr(self, "click_status_statictext"):
-                self.click_status_statictext.SetLabel(f"第{self.batch_value}批点赞任务，已完成。"
+            if hasattr(self, "click_status_static_text"):
+                self.click_status_static_text.SetLabel(f"第{self.batch_value}批点赞任务，已完成。"
                                                       f"成功：{total_likes - 1}个")
             else:
-                self.click_status_statictext = wx.StaticText(parent=self.panel,
+                self.click_status_static_text = wx.StaticText(parent=self.panel,
                                                              label=f"第{self.batch_value}批点赞任务，已完成。"
                                                                    f"成功：{total_likes - 1}个",
                                                              pos=(10, 220))
         else:
-            if hasattr(self, "click_status_statictext"):
-                self.click_status_statictext.SetLabel(
+            if hasattr(self, "click_status_static_text"):
+                self.click_status_static_text.SetLabel(
                     f"本次点赞任务，未完成。失败：{self.current_click_num - total_likes}个")
             else:
-                self.click_status_statictext = wx.StaticText(parent=self.panel,
+                self.click_status_static_text = wx.StaticText(parent=self.panel,
                                                              label=f"第{self.batch_value}批点赞任务，未完成。"
                                                                    f"失败：{self.current_click_num - total_likes}个",
                                                              pos=(10, 220))
@@ -1121,8 +1124,9 @@ class MyFrame(wx.Frame):
         else:
             self.pause_resume_button.Disable()
             self.start_button.Enable()
+            self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
-    def click_task(self, device):
+    def click_task(self, device, selected_android_option_name):
         """
         直播点赞任务控件
         :return:
@@ -1145,7 +1149,7 @@ class MyFrame(wx.Frame):
                     self.current_click_num = click_num_total - self.global_click_num
                     self.total_click_num -= 1
                 # 开始点赞
-                self.click_simulator_control(device)
+                self.click_simulator_control(device, selected_android_option_name)
                 # 点赞结束后，需要冷却时间
                 click_date_end = datetime.now()
                 # TODO 正式环境打开
@@ -1162,6 +1166,7 @@ class MyFrame(wx.Frame):
                     else:
                         self.wait_event.clear()  # 重置事件状态
                 self.click_date_start = click_date_end
+        self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
     def click_simulator(self, total_likes, device):
         """
@@ -1220,7 +1225,8 @@ class MyFrame(wx.Frame):
         :return: 文件默认数据
         """
         config_read = configparser.ConfigParser()
-        config_read.read('config.ini')
+        config_path = os.path.join(current_dir, 'config', 'config.ini')
+        config_read.read(config_path)
         # 配置文件默认值
         default_values = []
         for section in config_read.sections():
@@ -1231,7 +1237,7 @@ class MyFrame(wx.Frame):
             default_values.append((num, interval, time, batch))
         return default_values
 
-    def comment_control(self, device):
+    def comment_control(self, device, selected_android_option_name):
         """
         评论控件
         """

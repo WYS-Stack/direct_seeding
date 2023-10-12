@@ -19,7 +19,7 @@
 
 # 打包命令
 ```shell
-pyinstaller --onefile --windowed --icon=app.icns feibo.py
+pyinstaller --windowed --icon=app.icns feibo.py --add-data "config:config" --add-data "img:img" --add-data "logger:logger"
 ```
 
 # 界面元素选取

@@ -3,7 +3,7 @@
 *.apk
 build
 dist
-wxpython_continuous_mouse_click.spec
+*.spec
 logs
 .idea
 .DS_Store
