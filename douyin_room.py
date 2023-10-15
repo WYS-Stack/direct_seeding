@@ -54,8 +54,8 @@ class DouYinRoom:
         进入搜索页面
         """
         if d(resourceId="com.ss.android.ugc.aweme:id/j1+").wait() or \
-           d(resourceId="com.ss.android.ugc.aweme:id/xkp").wait() or \
-           d(resourceId="com.ss.android.ugc.aweme:id/o2z").wait():
+                d(resourceId="com.ss.android.ugc.aweme:id/xkp").wait() or \
+                d(resourceId="com.ss.android.ugc.aweme:id/o2z").wait():
             if d(resourceId="com.ss.android.ugc.aweme:id/j1+").click_exists():
                 await self.enter_home_page(d)
             elif d(resourceId="com.ss.android.ugc.aweme:id/xkp").exists:
@@ -94,8 +94,8 @@ class DouYinRoom:
         进入账号信息页面
         """
         logger.info("确定当前为账号信息页面")
-        if d(resourceId="com.ss.android.ugc.aweme:id/k_8").exists(): # 直播标识
-            d(resourceId="com.ss.android.ugc.aweme:id/vcj").click() # '···'按钮
+        if d(resourceId="com.ss.android.ugc.aweme:id/k_8").exists():  # 直播标识
+            d(resourceId="com.ss.android.ugc.aweme:id/vcj").click()  # '···'按钮
             id_flag = d(resourceId="com.ss.android.ugc.aweme:id/re+")
             if id_flag.exists:
                 douyin_id = id_flag.get_text().split("抖音号: ")[1]  # 获取抖音账号
@@ -132,7 +132,7 @@ class DouYinRoom:
         进入账号直播页面
         """
         if d(resourceId="com.ss.android.ugc.aweme:id/cw").click_exists() or \
-           d(resourceId="com.ss.android.ugc.aweme:id/uej").click_exists():
+                d(resourceId="com.ss.android.ugc.aweme:id/uej").click_exists():
             logger.info("已查询到账号直播信息")
             if d(resourceId="com.ss.android.ugc.aweme:id/k_8").exists:
                 if d(resourceId="com.ss.android.ugc.aweme:id/o2z").click_exists():
@@ -182,10 +182,25 @@ class DouYinRoom:
             if d(resourceId="com.ss.android.ugc.aweme:id/c6+").exists:
                 return True
             logger.info("等待进入直播间...")
-            time.sleep(1)
+            # 尝试重新进入
+            if d.xpath(
+                    '//*[@resource-id="com.ss.android.ugc.aweme:id/lxd"]/android.widget.LinearLayout['
+                    '2]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                    '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                    '1]/com.lynx.tasm.behavior.ui.LynxFlattenUI[3]').click_exists(timeout=0.5):
+                logger.info("尝试点击搜索页面直播主窗口进入")
+            if d.xpath(
+                    '//*[@resource-id="com.ss.android.ugc.aweme:id/lxd"]/android.widget.LinearLayout['
+                    '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                    '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
+                    '1]/com.lynx.tasm.behavior.ui.view.UIView[3]').click_exists(timeout=0.5):
+                logger.info("尝试点击搜索页面账号头像进入")
+            if d(resourceId="com.ss.android.ugc.aweme:id/o2z").click_exists(timeout=0.5):
+                logger.info("尝试点击账号详情头像进入")
         return False
 
-    def on_task_completed(self, result):
+    @staticmethod
+    def on_task_completed(result):
         """
         提示弹窗
         :param result: 提示信息

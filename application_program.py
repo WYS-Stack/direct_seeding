@@ -44,9 +44,9 @@ class App_Program:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
                           "Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.69"
         }
-        timeout = aiohttp.ClientTimeout(total=10)  # 设置超时时间为10秒
-        conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
         try:
+            timeout = aiohttp.ClientTimeout(total=10)  # 设置超时时间为10秒
+            conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
             async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
                 async with session.get(self.url, headers=self.headers) as response:
                     if response.status == 200:
@@ -57,8 +57,8 @@ class App_Program:
                         version = version_element.text_content()
                         download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
                         return version, download_url
-        except aiohttp.ClientError as e:
-            logger.info(e)
+        except Exception as e:
+            logger.error(traceback.print_exc())
             return None, None
 
     async def check_application_version(self, timeout=30):

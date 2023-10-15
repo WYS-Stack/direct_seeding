@@ -580,7 +580,7 @@ class MyFrame(wx.Frame):
         :return: 是/否
         """
         # 查看设备信息下是否记录有当前设备
-        if selected_android_option_name in self.devices_info:
+        if selected_android_option_name in self.devices_info and self.devices_info[selected_android_option_name].get("status"):
             status = self.devices_info[selected_android_option_name]["status"]
             # 已启动
             if status == "started":
@@ -655,7 +655,7 @@ class MyFrame(wx.Frame):
                     # 启动超时
                     self.animation.Hide()
                     self.switch_on_button()
-                    wx.MessageBox('安卓模拟器启动失败', '警告', wx.YES_NO | wx.ICON_ERROR)
+                    wx.MessageBox('请重新启动模拟器', '警告', wx.YES_NO | wx.ICON_ERROR)
                     break
             else:
                 self.animation.Show()
@@ -708,7 +708,8 @@ class MyFrame(wx.Frame):
             self.sb.SetStatusText('状态信息:关闭中', 2)
             self.switch_on_button()
 
-    async def start_simulator(self,selected_android_option_name):
+    @staticmethod
+    async def start_simulator(selected_android_option_name):
         """
         开启安卓模拟器
         """
@@ -903,7 +904,7 @@ class MyFrame(wx.Frame):
         app = App_Program(self.panel, device.serial, self.Application_program_name)
         # 启动atx-agent
         await app.start_atx_agent()
-        await asyncio.sleep(3)
+        await asyncio.sleep(1)
         # 检查应用程序
         await app.check_application_program()
         # 启动应用程序
@@ -936,7 +937,7 @@ class MyFrame(wx.Frame):
 
     def wait_device_start(self, selected_android_option_name, timeout=30):
         """
-        等待模拟器启动
+        启动并等待模拟器启动
         :param selected_android_option_name: 选中的安卓模拟器名称
         :param timeout: 最大等待时间（秒）
         """
@@ -986,6 +987,8 @@ class MyFrame(wx.Frame):
 
         if not task_status:
             task_status = "accept"
+            if not self.devices_info.get(selected_android_option_name):
+                self.devices_info[selected_android_option_name] = {}
             self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
         # 防止未启动设备直接开始
@@ -998,12 +1001,12 @@ class MyFrame(wx.Frame):
                 self.check_device_in_adb_devices(selected_android_option_name)
                 if self.devices_info.get(selected_android_option_name):
                     device = self.devices_info[selected_android_option_name]["server"]
-                    if task_status == "accept":
+                    if self.devices_info.get(selected_android_option_name, {}).get('task_status') == "accept":
                         device_status = self.wait_device_full_start(device,selected_android_option_name)
                         if device_status:
                             self.before_start_control(selected_android_option_name)
                 else:
-                    if task_status == "accept":
+                    if self.devices_info.get(selected_android_option_name, {}).get('task_status') == "accept":
                         self.wait_device_start(selected_android_option_name)
         else:
             if task_status == "accept":
@@ -1103,18 +1106,18 @@ class MyFrame(wx.Frame):
                                                       f"成功：{total_likes - 1}个")
             else:
                 self.click_status_static_text = wx.StaticText(parent=self.panel,
-                                                             label=f"第{self.batch_value}批点赞任务，已完成。"
-                                                                   f"成功：{total_likes - 1}个",
-                                                             pos=(10, 220))
+                                                              label=f"第{self.batch_value}批点赞任务，已完成。"
+                                                                    f"成功：{total_likes - 1}个",
+                                                              pos=(10, 220))
         else:
             if hasattr(self, "click_status_static_text"):
                 self.click_status_static_text.SetLabel(
                     f"本次点赞任务，未完成。失败：{self.current_click_num - total_likes}个")
             else:
                 self.click_status_static_text = wx.StaticText(parent=self.panel,
-                                                             label=f"第{self.batch_value}批点赞任务，未完成。"
-                                                                   f"失败：{self.current_click_num - total_likes}个",
-                                                             pos=(10, 220))
+                                                              label=f"第{self.batch_value}批点赞任务，未完成。"
+                                                                    f"失败：{self.current_click_num - total_likes}个",
+                                                              pos=(10, 220))
         # 如果是点赞任务，当任务完全结束时开启按钮
         if self.checked:
             if self.config_value == self.config_values[-1]:
