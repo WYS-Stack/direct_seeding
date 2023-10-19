@@ -20,7 +20,7 @@ class ClickWindow(wx.Frame):
         # 读取配置文件获取结果
         config_read = configparser.ConfigParser()
         current_parent_path = os.path.dirname(os.path.abspath(__file__))
-        config_read.read(current_parent_path+'/config.ini')
+        config_read.read(current_parent_path+'/config/config.ini')
         # 配置文件默认值
         default_values = []
         for section in config_read.sections():
@@ -65,6 +65,14 @@ class ClickWindow(wx.Frame):
             config[section_name]['interval'] = value[1]
             config[section_name]['time'] = value[2]
             config[section_name]['batch'] = value[3]
+        current_parent_path = os.path.dirname(os.path.abspath(__file__))
 
-        with open('../../direct_seeding/config.ini', 'w') as configfile:
+        with open(current_parent_path + '/config/config.ini', 'w') as configfile:
             config.write(configfile)
+
+
+if __name__ == '__main__':
+    app = wx.App()
+    new_frame = ClickWindow(None)
+    new_frame.Show()
+    app.MainLoop()

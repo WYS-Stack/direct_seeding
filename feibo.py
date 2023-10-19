@@ -47,7 +47,7 @@ class FeiboFrame(wx.Frame):
         self.current_click_num = 0
         # 默认点击的坐标轴
         self.click_X = 302
-        self.click_Y = 534
+        self.click_Y = 750
         # 默认点击间隔
         self.click_T = 0.1
         # 累积点赞数量
@@ -66,6 +66,8 @@ class FeiboFrame(wx.Frame):
         self.check_device_connection()
         # 记录所有设备实时信息
         self.devices_info = {}
+        # 存储当前选中的设备名称
+        self.current_option = None
         # 主控制面板
         self.control_panel_main()
 
@@ -197,7 +199,6 @@ class FeiboFrame(wx.Frame):
         else:
             self.Android_choice.Set(android_list)
         # 初始化下拉列表，并添加开启关闭控件
-        self.choice_android_device(None)
         self.Android_choice.Bind(wx.EVT_CHOICE, self.choice_android_device)
 
         # 初始化状态栏信息
@@ -206,23 +207,20 @@ class FeiboFrame(wx.Frame):
             self.sb.SetStatusText('', 1)
             self.sb.SetStatusText('状态信息:未启动', 2)
 
-        self.app_id_statictext = wx.StaticText(parent=self.panel, label="请输入ID：", pos=(10, 70))
-        self.app_id_text_ctrl = wx.TextCtrl(self.panel, pos=(140, 68), size=(200, -1), style=wx.TE_PROCESS_ENTER)
-        self.app_id_text_ctrl.Bind(wx.EVT_TEXT, self.on_text_change)
-        self.app_id_text_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter)
-        self.app_id_text_ctrl.Bind(wx.EVT_SET_FOCUS, self.on_text_focus)
-        self.app_id_text_ctrl.Bind(wx.EVT_KILL_FOCUS, self.on_text_lost_focus)
-        self.app_id_text_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+        self.input_id_text = wx.StaticText(parent=self.panel, label="请输入ID：", pos=(10, 70))
+        self.input_id = wx.TextCtrl(self.panel, pos=(140, 68), size=(200, -1), style=wx.TE_PROCESS_ENTER)
+        self.input_id.Bind(wx.EVT_TEXT, self.on_text_change)
+        self.input_id.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter)
+        self.input_id.Bind(wx.EVT_SET_FOCUS, self.on_text_focus)
+        self.input_id.Bind(wx.EVT_KILL_FOCUS, self.on_text_lost_focus)
+        self.input_id.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
 
-        # 输入框控件
-        # 创建静态文本(StaticText)对象，将静态文本对象放到panel面板中，所以parent参数传递的是panel，参数label是在静态文本对象上显示的文字，
-        # 参数pos用于设置静态文本对象的位置
-        self.input_click_statictext = wx.StaticText(parent=self.panel, label="请输入本次点赞数量：",
-                                                    pos=(10, 100))
-        self.input_click_text_ctrl = wx.TextCtrl(self.panel, pos=(140, 98), size=(200, -1))
+        self.input_click_text = wx.StaticText(parent=self.panel, label="请输入本次点赞数量：", pos=(10, 100))
+        self.input_click_num = wx.SpinCtrl(self.panel, pos=(140, 98), size=(80, -1), min=0, max=999999)
+        self.input_click_num.SetIncrement(10)  # 设置步进值为10
 
         # 复选框
-        self.confirm_click_statictext = wx.StaticText(parent=self.panel, label="是否启用自动点赞：",
+        self.confirm_click_text = wx.StaticText(parent=self.panel, label="是否启用自动点赞：",
                                                       pos=(10, 130))
         self.confirm_click_checkbox = wx.CheckBox(self.panel, label="启用", pos=(140, 130))
 
@@ -231,7 +229,7 @@ class FeiboFrame(wx.Frame):
         self.click_button.Bind(wx.EVT_BUTTON, self.open_click_config)
 
         # 评论
-        self.confirm_comment_statictext = wx.StaticText(parent=self.panel, label="是否启用自动评论：",
+        self.confirm_comment_text = wx.StaticText(parent=self.panel, label="是否启用自动评论：",
                                                         pos=(10, 160))
         self.confirm_comment_checkbox = wx.CheckBox(self.panel, label="启用", pos=(140, 160))
         # 评论配置
@@ -241,12 +239,31 @@ class FeiboFrame(wx.Frame):
         self.start_button = wx.Button(parent=self.panel, label="开始", pos=(30, 250), size=(100, -1))
         self.start_button.Bind(wx.EVT_BUTTON, self.start_control)
 
-        self.stop_button = wx.Button(parent=self.panel, label="取消", pos=(200, 250), size=(100, -1))
-        self.stop_button.Bind(wx.EVT_BUTTON, self.cancel_control)
+        self.cancel_button = wx.Button(parent=self.panel, label="取消", pos=(200, 250), size=(100, -1))
+        self.cancel_button.Bind(wx.EVT_BUTTON, self.cancel_control)
 
         self.pause_resume_button = wx.Button(parent=self.panel, label="暂停", pos=(370, 250), size=(100, -1))
-        self.pause_resume_button.Bind(wx.EVT_BUTTON, self.on_pause_resume)
+        self.pause_resume_button.Bind(wx.EVT_BUTTON, self.pause_resume_control)
+
+        self.choice_android_device(None)
+
+    def unstarted_buttons(self):
+        """
+        未启动时的按钮状态
+        :return:
+        """
+        self.start_button.Enable()
         self.pause_resume_button.Disable()
+        self.cancel_button.Disable()
+
+    def started_buttons(self, selected_android_option_name):
+        """
+        启动后的按钮状态
+        """
+        if self.current_option == selected_android_option_name:
+            self.start_button.Disable()
+            self.pause_resume_button.Enable()
+            self.cancel_button.Enable()
 
     @staticmethod
     def read_history(filename):
@@ -273,7 +290,7 @@ class FeiboFrame(wx.Frame):
         """
         文本框内容发生改变时，展示不同的历史记录
         """
-        entered_text = self.app_id_text_ctrl.GetValue()
+        entered_text = self.input_id.GetValue()
         if entered_text:
             matching_items = [item for item in self.history_list if entered_text.lower() in item.lower()]
             if matching_items:
@@ -292,7 +309,7 @@ class FeiboFrame(wx.Frame):
         """
         文本框内回车时，将其添加到历史记录
         """
-        entered_text = self.app_id_text_ctrl.GetValue()
+        entered_text = self.input_id.GetValue()
         if entered_text:
             matching_items = [item for item in self.history_list if entered_text.lower() in item.lower()]
             if not matching_items:
@@ -311,9 +328,9 @@ class FeiboFrame(wx.Frame):
         if self.history_popup and self.history_popup.GetSelection() != wx.NOT_FOUND:
             selected_item = self.history_popup.GetString(self.history_popup.GetSelection())
             self.history_popup.Destroy()
-            self.app_id_text_ctrl.SetValue(selected_item)
+            self.input_id.SetValue(selected_item)
             # 设置光标在文本的末尾
-            self.app_id_text_ctrl.SetInsertionPointEnd()
+            self.input_id.SetInsertionPointEnd()
 
         if self.history_popup:
             self.history_popup.Destroy()
@@ -322,7 +339,7 @@ class FeiboFrame(wx.Frame):
         """
         获得焦点时（默认展示4个历史记录）
         """
-        entered_text = self.app_id_text_ctrl.GetValue()
+        entered_text = self.input_id.GetValue()
         if not self.history_popup and not entered_text:
             self.show_history_popup(self.history_list)
         else:
@@ -363,7 +380,7 @@ class FeiboFrame(wx.Frame):
         """
         ⬇️下键
         """
-        entered_text = self.app_id_text_ctrl.GetValue()
+        entered_text = self.input_id.GetValue()
         if entered_text:
             self.on_text_change(None)
 
@@ -384,9 +401,9 @@ class FeiboFrame(wx.Frame):
         """
         if self.history_popup and self.selected_index != -1:
             selected_item = self.history_choices[self.selected_index]
-            self.app_id_text_ctrl.SetValue(selected_item)
+            self.input_id.SetValue(selected_item)
             # 设置光标在文本的末尾
-            self.app_id_text_ctrl.SetInsertionPointEnd()
+            self.input_id.SetInsertionPointEnd()
             self.history_popup.Destroy()
 
     def show_history_popup(self, data):
@@ -400,13 +417,13 @@ class FeiboFrame(wx.Frame):
         self.history_popup.Bind(wx.EVT_LISTBOX, self.on_listbox_select)
         # 历史记录框大小
         if len(data[:4]) > 0:
-            self.history_popup.SetSize((self.app_id_text_ctrl.GetSize().GetWidth(), 16 + 18 * len(data[:4])))
+            self.history_popup.SetSize((self.input_id.GetSize().GetWidth(), 16 + 18 * len(data[:4])))
         else:
             self.history_popup.Hide()
         # 历史记录框位置
         self.history_popup.SetPosition(
-            (self.app_id_text_ctrl.GetPosition().x,
-             self.app_id_text_ctrl.GetPosition().y + self.app_id_text_ctrl.GetSize().GetHeight()))
+            (self.input_id.GetPosition().x,
+             self.input_id.GetPosition().y + self.input_id.GetSize().GetHeight()))
         self.selected_index = -1
 
     def start_task(self, target, device, selected_android_option_name):
@@ -416,19 +433,19 @@ class FeiboFrame(wx.Frame):
         :param device: 需要操作的模拟器
         :param selected_android_option_name: 当前模拟器
         """
-        # 取消标签
-        stop_flag = threading.Event()
-        # 暂停标签
-        pause_flag = threading.Event()
-        # 等待线程
-        wait_event = threading.Event()
+        # 当前任务线程
         thread = threading.Thread(target=target, args=(device, selected_android_option_name))
-        self.devices_info[selected_android_option_name]["stop_flag"] = stop_flag
-        self.devices_info[selected_android_option_name]["pause_flag"] = pause_flag
-        self.devices_info[selected_android_option_name]["wait_event"] = wait_event
         self.devices_info[selected_android_option_name]["current_task"] = thread
-        stop_flag.clear()
-        pause_flag.clear()
+        # 当前线程运行状态
+        is_running = threading.Event()
+        is_running.set()
+        self.devices_info[selected_android_option_name]['is_running'] = is_running
+        # 暂停/继续按钮状态
+        pause_resume = threading.Event()
+        self.devices_info[selected_android_option_name]["pause_resume"] = pause_resume
+        self.started_buttons(selected_android_option_name)
+        self.devices_info[selected_android_option_name].update(
+            {"start_button": False, "pause_resume_button": True, "cancel_button": True})
         thread.start()
 
     def stop_task(self):
@@ -455,7 +472,7 @@ class FeiboFrame(wx.Frame):
         关闭主控制面板窗口"x"控件
         :param evt: 当前窗口
         """
-        self.stop_task()
+        # self.stop_task()
         # 主窗口关闭时，子窗口也要关闭
         if hasattr(self, "self.new_frame"):
             self.new_frame.Close()
@@ -515,6 +532,26 @@ class FeiboFrame(wx.Frame):
         # 开启中、未启动（显开启按钮）
         else:
             self.switch_on_button()
+
+        self.current_option = selected_android_option_name
+        if status == "started" and self.devices_info[selected_android_option_name].get("is_running"):
+            if self.devices_info[selected_android_option_name]["is_running"].is_set():
+                self.started_buttons(selected_android_option_name)
+                if self.devices_info[selected_android_option_name]["pause_resume"].is_set():
+                    self.pause_resume_button.SetLabel("继续")
+                    self.devices_info[selected_android_option_name].update({"pause_resume_button": False})
+                else:
+                    self.pause_resume_button.SetLabel("暂停")
+                    self.devices_info[selected_android_option_name].update({"pause_resume_button": True})
+        else:
+            self.unstarted_buttons()
+            self.pause_resume_button.SetLabel("暂停")
+            keys = ["start_button", "pause_resume_button", "cancel_button"]
+            if all(i in self.devices_info[selected_android_option_name] for i in keys):
+                state = self.devices_info[selected_android_option_name]
+                self.start_button.Enable(state["start_button"])
+                self.cancel_button.Enable(state["cancel_button"])
+                self.pause_resume_button.Enable(state["pause_resume_button"])
 
     def choice_application_program(self, event):
         """选择应用程序"""
@@ -975,8 +1012,8 @@ class FeiboFrame(wx.Frame):
         开始前准备工作
         """
         selected_android_option_name = self.get_choice_android_device_name()
-        self.app_id = self.app_id_text_ctrl.GetValue()
-        self.current_click_num = int(self.input_click_text_ctrl.GetValue() or 0)
+        self.app_id = self.input_id.GetValue()
+        self.current_click_num = int(self.input_click_num.GetValue())
         self.checked = self.confirm_click_checkbox.GetValue()
         self.comment_checked = self.confirm_comment_checkbox.GetValue()
 
@@ -988,7 +1025,7 @@ class FeiboFrame(wx.Frame):
         if not self.current_click_num and not self.checked and not self.comment_checked:
             wx.MessageBox('1.请输入点赞次数\n2.选中点赞任务\n3.选择评论任务', '提示', wx.OK | wx.ICON_INFORMATION)
             return
-        elif self.current_click_num and self.current_click_num <= 0:
+        elif self.current_click_num and self.current_click_num < 1:
             wx.MessageBox('点赞数量要大于0', '提示', wx.OK | wx.ICON_INFORMATION)
             return
 
@@ -1044,23 +1081,11 @@ class FeiboFrame(wx.Frame):
             if self.current_click_num:
                 self.total_click_num -= 1
                 self.start_task(self.click_simulator_control, device, selected_android_option_name)
-                self.start_button.Disable()
-                self.pause_resume_button.SetLabel("暂停")
-                self.pause_resume_button.Enable()
-                self.stop_button.Enable()
             if self.checked:
                 self.click_date_start = datetime.now()
                 self.start_task(self.click_task, device, selected_android_option_name)
-                self.start_button.Disable()
-                self.pause_resume_button.SetLabel("暂停")
-                self.pause_resume_button.Enable()
-                self.stop_button.Enable()
             if self.comment_checked:
                 self.start_task(self.comment_control, device, selected_android_option_name)
-                self.start_button.Disable()
-                self.pause_resume_button.SetLabel("暂停")
-                self.pause_resume_button.Enable()
-                self.stop_button.Enable()
         else:
             self.devices_info[selected_android_option_name]['task_status'] = 'accept'
             wx.CallAfter(self.on_task_completed, "直播间进入失败")
@@ -1094,22 +1119,16 @@ class FeiboFrame(wx.Frame):
         """
         total_likes = 0
         self.batch_value += 1
-        stop_flag = self.devices_info[selected_android_option_name]["stop_flag"]
-        pause_flag = self.devices_info[selected_android_option_name]["pause_flag"]
-        for i in range(self.current_click_num + 1):
-            if hasattr(self, "global_click_num"):
-                self.global_click_num += 1
-            total_likes += 1
-            # 异步调用开始点赞，并传递参数total_likes
-            wx.CallAfter(self.click_simulator, total_likes, device)
-
-            if stop_flag.is_set():
-                break
-            while pause_flag.is_set():
-                wx.MilliSleep(100)
-                if stop_flag.is_set():
-                    break
-            wx.MilliSleep(400)
+        current_click_num = self.current_click_num + 1
+        while current_click_num > 0 and self.devices_info[selected_android_option_name]['is_running'].is_set():
+            if not self.devices_info[selected_android_option_name]["pause_resume"].is_set():
+                if hasattr(self, "global_click_num"):
+                    self.global_click_num += 1
+                total_likes += 1
+                current_click_num -= 1
+                # 异步调用开始点赞，并传递参数total_likes
+                wx.CallAfter(self.click_simulator, total_likes, device)
+                wx.MilliSleep(400)
 
         # 判断此次点赞任务是否完成
         if total_likes - 1 == self.current_click_num:
@@ -1133,14 +1152,26 @@ class FeiboFrame(wx.Frame):
         # 如果是点赞任务，当任务完全结束时开启按钮
         if self.checked:
             if self.config_value == self.config_values[-1]:
-                self.pause_resume_button.Disable()
-                self.start_button.Enable()
-                self.devices_info[selected_android_option_name]["task_status"] = "accept"
+                self.task_end_button_status(selected_android_option_name)
         # 当是单次点击任务时
         else:
-            self.pause_resume_button.Disable()
-            self.start_button.Enable()
-            self.devices_info[selected_android_option_name]["task_status"] = "accept"
+            self.task_end_button_status(selected_android_option_name)
+
+    def task_end_button_status(self, selected_android_option_name):
+        """
+        任务结束时按钮的状态
+        """
+        if selected_android_option_name == self.current_option:
+            self.devices_info[selected_android_option_name]["is_running"].clear()
+            self.unstarted_buttons()
+            self.pause_resume_button.SetLabel("暂停")
+            self.devices_info[selected_android_option_name].update(
+                {"start_button": True, "pause_resume_button": False, "cancel_button": False})
+        else:
+            self.devices_info[selected_android_option_name]["is_running"].clear()
+            self.devices_info[selected_android_option_name].update(
+                {"start_button": True, "pause_resume_button": False, "cancel_button": False})
+        self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
     def click_task(self, device, selected_android_option_name):
         """
@@ -1149,7 +1180,7 @@ class FeiboFrame(wx.Frame):
         """
         if not hasattr(self, "self.config_values"):
             self.config_values = self.read_config()
-        wait_event = self.devices_info[selected_android_option_name]["wait_event"]
+        is_running = self.devices_info[selected_android_option_name]["is_running"]
         for config_value in self.config_values:
             click_num_total = int(config_value[0])  # 点赞总量
             self.click_T = float(config_value[1])  # 点赞间隔
@@ -1175,13 +1206,14 @@ class FeiboFrame(wx.Frame):
                 time_cooling = 3
                 if time_cooling > 0:
                     # 等待time_cooling秒
-                    wait_event.wait(timeout=time_cooling)
+                    is_running.clear()
+                    is_running.wait(timeout=time_cooling)
                     # 当取消按钮被点击，wait_event标记会为True，并取消上一步的等待，继续执行
-                    if wait_event.is_set():
-                        wait_event.clear()  # 重置事件状态
+                    if is_running.is_set():
+                        is_running.set()  # 重置事件状态
                         break
                     else:
-                        wait_event.clear()  # 重置事件状态
+                        is_running.set()  # 重置事件状态
                 self.click_date_start = click_date_end
         self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
@@ -1219,24 +1251,32 @@ class FeiboFrame(wx.Frame):
             2.显示开始按钮
             3.禁用取消/暂停按钮
         """
-        self.stop_task()
-        self.start_button.Enable()
+        selected_android_option_name = self.get_choice_android_device_name()
+        self.devices_info[selected_android_option_name]["is_running"].clear()
+        self.devices_info[selected_android_option_name]["current_task"].join()
+        if selected_android_option_name == self.current_option:
+            self.unstarted_buttons()
+            self.pause_resume_button.SetLabel("暂停")
+            self.devices_info[selected_android_option_name].update(
+                {"start_button": True, "pause_resume_button": False, "cancel_button": False})
+        else:
+            self.devices_info[selected_android_option_name].update(
+                {"start_button": True, "pause_resume_button": False, "cancel_button": False})
 
-        self.stop_button.Disable()
-        self.pause_resume_button.Disable()
-
-    def on_pause_resume(self, evt):
+    def pause_resume_control(self, evt):
         """
         暂停/继续按钮
         """
         selected_android_option_name = self.get_choice_android_device_name()
-        pause_flag = self.devices_info[selected_android_option_name]["pause_flag"]
-        if pause_flag.is_set():
-            pause_flag.clear()
+        pause_resume_flag = self.devices_info[selected_android_option_name]["pause_resume"]
+        if pause_resume_flag.is_set():
+            pause_resume_flag.clear()
             self.pause_resume_button.SetLabel("暂停")
+            self.devices_info[selected_android_option_name].update({"pause_status": True})
         else:
-            pause_flag.set()
+            pause_resume_flag.set()
             self.pause_resume_button.SetLabel("继续")
+            self.devices_info[selected_android_option_name].update({"pause_status": False})
 
     def read_config(self):
         """
