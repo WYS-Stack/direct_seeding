@@ -2,10 +2,12 @@ import asyncio
 import configparser
 import functools
 import os
+import random
 import subprocess
 import threading
 import time
 
+import pandas as pd
 import wx
 import wx.adv
 import uiautomator2 as u2
@@ -14,17 +16,16 @@ from datetime import datetime
 from PyQt5.QtWidgets import QApplication
 from ppadb.client import Client as AdbClient
 
-from click_config_frame import Click_ConfigFrame
-from douyin_room import DouYinRoom
 from logger import logger
 from application_program import App_Program
-from comment_frame import CommentWindow
+from douyin_room import DouYinRoom
+from click_config_frame import ClickWindow
+from comment_config_frame import CommentWindow
 
 current_dir = os.path.dirname(__file__)
 
 
-# 自定义窗口类MyFrame
-class MyFrame(wx.Frame):
+class FeiboFrame(wx.Frame):
     id_open = wx.NewIdRef()
     id_save = wx.NewIdRef()
     id_quit = wx.NewIdRef()
@@ -33,12 +34,12 @@ class MyFrame(wx.Frame):
     id_about = wx.NewIdRef()
 
     def __init__(self, parent, title):
-        super(MyFrame, self).__init__(parent, title=title, size=(500, 500), pos=(600, 200))
+        super(FeiboFrame, self).__init__(parent, title=title, size=(500, 500), pos=(600, 200))
         self.Bind(wx.EVT_CLOSE, self.on_close_x)
         # 创建一个面板，self设置当前所在的父容器为当前窗口对象
         self.panel = wx.Panel(self)
 
-        # self._create_menubar()  # 菜单栏
+        self._create_menubar()  # 菜单栏
         # self._create_toolbar()  # 工具栏
         self._create_statusbar()  # 状态栏
 
@@ -60,15 +61,6 @@ class MyFrame(wx.Frame):
         self.history_filename = history_filename
         # 历史记录
         self.history_list = self.read_history(self.history_filename)
-
-        # 线程
-        self.thread = None
-        # 取消标签
-        self.stop_flag = threading.Event()
-        # 暂停标签
-        self.pause_flag = threading.Event()
-        # 等待线程
-        self.wait_event = threading.Event()
 
         # 检测设备连接
         self.check_device_connection()
@@ -215,7 +207,7 @@ class MyFrame(wx.Frame):
             self.sb.SetStatusText('状态信息:未启动', 2)
 
         self.app_id_statictext = wx.StaticText(parent=self.panel, label="请输入ID：", pos=(10, 70))
-        self.app_id_text_ctrl = wx.TextCtrl(self.panel, pos=(140, 68), size=(200, -1),style=wx.TE_PROCESS_ENTER)
+        self.app_id_text_ctrl = wx.TextCtrl(self.panel, pos=(140, 68), size=(200, -1), style=wx.TE_PROCESS_ENTER)
         self.app_id_text_ctrl.Bind(wx.EVT_TEXT, self.on_text_change)
         self.app_id_text_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_text_enter)
         self.app_id_text_ctrl.Bind(wx.EVT_SET_FOCUS, self.on_text_focus)
@@ -250,12 +242,12 @@ class MyFrame(wx.Frame):
         self.start_button.Bind(wx.EVT_BUTTON, self.start_control)
 
         self.stop_button = wx.Button(parent=self.panel, label="取消", pos=(200, 250), size=(100, -1))
-        self.stop_button.Bind(wx.EVT_BUTTON, self.click_cancel_control)
+        self.stop_button.Bind(wx.EVT_BUTTON, self.cancel_control)
 
         self.pause_resume_button = wx.Button(parent=self.panel, label="暂停", pos=(370, 250), size=(100, -1))
         self.pause_resume_button.Bind(wx.EVT_BUTTON, self.on_pause_resume)
         self.pause_resume_button.Disable()
-    
+
     @staticmethod
     def read_history(filename):
         """
@@ -397,7 +389,7 @@ class MyFrame(wx.Frame):
             self.app_id_text_ctrl.SetInsertionPointEnd()
             self.history_popup.Destroy()
 
-    def show_history_popup(self,data):
+    def show_history_popup(self, data):
         """
         展示历史记录
         :param data: 展示数据
@@ -413,41 +405,57 @@ class MyFrame(wx.Frame):
             self.history_popup.Hide()
         # 历史记录框位置
         self.history_popup.SetPosition(
-            (self.app_id_text_ctrl.GetPosition().x, self.app_id_text_ctrl.GetPosition().y + self.app_id_text_ctrl.GetSize().GetHeight()))
+            (self.app_id_text_ctrl.GetPosition().x,
+             self.app_id_text_ctrl.GetPosition().y + self.app_id_text_ctrl.GetSize().GetHeight()))
         self.selected_index = -1
 
-    def start_thread(self, target, device, selected_android_option_name):
+    def start_task(self, target, device, selected_android_option_name):
         """
-        开始线程
+        开始任务
         :param target: 点赞/评论任务
         :param device: 需要操作的模拟器
         :param selected_android_option_name: 当前模拟器
         """
-        if self.thread is None or not self.thread.is_alive():
-            self.stop_flag.clear()
-            self.pause_flag.clear()
-            self.thread = threading.Thread(target=target, args=(device, selected_android_option_name))
-            self.thread.start()
+        # 取消标签
+        stop_flag = threading.Event()
+        # 暂停标签
+        pause_flag = threading.Event()
+        # 等待线程
+        wait_event = threading.Event()
+        thread = threading.Thread(target=target, args=(device, selected_android_option_name))
+        self.devices_info[selected_android_option_name]["stop_flag"] = stop_flag
+        self.devices_info[selected_android_option_name]["pause_flag"] = pause_flag
+        self.devices_info[selected_android_option_name]["wait_event"] = wait_event
+        self.devices_info[selected_android_option_name]["current_task"] = thread
+        stop_flag.clear()
+        pause_flag.clear()
+        thread.start()
 
-    def stop_thread(self):
+    def stop_task(self):
         """
-        停止线程——点赞
-            当线程存在并且处于活动状态时，
-                设置等待时间为True时，任务等待会被取消
-                设置停止标签为True时，会停止点赞
-                恢复暂停标签为False，为True时会暂停到当前位置
+        停止任务
+            当线程存在并且处于活动状态时：
+            设置等待时间为True时，任务等待会被取消
+            设置停止标签为True时，会停止点赞/评论
+            恢复暂停标签为False，为True时会暂停到当前位置
         """
-        if self.thread is not None and self.thread.is_alive():
-            self.wait_event.set()
-            self.stop_flag.set()
-            self.pause_flag.clear()
+        selected_android_option_name = self.get_choice_android_device_name()
+        if self.devices_info[selected_android_option_name].get("current_task"):
+            thread = self.devices_info[selected_android_option_name]["current_task"]
+            wait_event = self.devices_info[selected_android_option_name]["wait_event"]
+            stop_flag = self.devices_info[selected_android_option_name]["stop_flag"]
+            pause_flag = self.devices_info[selected_android_option_name]["pause_flag"]
+            if thread is not None and thread.is_alive():
+                wait_event.set()
+                stop_flag.set()
+                pause_flag.clear()
 
     def on_close_x(self, evt):
         """
         关闭主控制面板窗口"x"控件
         :param evt: 当前窗口
         """
-        self.stop_thread()
+        self.stop_task()
         # 主窗口关闭时，子窗口也要关闭
         if hasattr(self, "self.new_frame"):
             self.new_frame.Close()
@@ -560,7 +568,7 @@ class MyFrame(wx.Frame):
             self.Reconnect_button = wx.Button(parent=self.panel, label="关闭", pos=(300, 10), size=(100, -1))
         self.Reconnect_button.Bind(wx.EVT_BUTTON, self.stop_device)
 
-    def check_animation_status(self,selected_android_option_name):
+    def check_animation_status(self, selected_android_option_name):
         """动态加载状态"""
         if selected_android_option_name in self.devices_info and self.devices_info[selected_android_option_name]:
             # 启动中、关闭中
@@ -580,7 +588,8 @@ class MyFrame(wx.Frame):
         :return: 是/否
         """
         # 查看设备信息下是否记录有当前设备
-        if selected_android_option_name in self.devices_info and self.devices_info[selected_android_option_name].get("status"):
+        if selected_android_option_name in self.devices_info and self.devices_info[selected_android_option_name].get(
+                "status"):
             status = self.devices_info[selected_android_option_name]["status"]
             # 已启动
             if status == "started":
@@ -692,10 +701,10 @@ class MyFrame(wx.Frame):
             self.animation.Show()
             self.sb.SetStatusText('状态信息:启动中', 2)
             # 异步调用开启模拟器
-            start_simulator = functools.partial(self.start_simulator,selected_android_option_name)
+            start_simulator = functools.partial(self.start_simulator, selected_android_option_name)
             asyncio.run(start_simulator())
             # 异步监听开启状态
-            threading.Thread(target=self.listener_start_thread,args=(selected_android_option_name,)).start()
+            threading.Thread(target=self.listener_start_thread, args=(selected_android_option_name,)).start()
         elif status == "starting":
             self.sb.SetStatusText('状态信息:启动中', 2)
         elif status == "started":
@@ -838,7 +847,7 @@ class MyFrame(wx.Frame):
             self.sb.SetStatusText('状态信息:开启中', 2)
             self.switch_off_button()
 
-    async def close_simulator(self, device=None,selected_android_option_name=None):
+    async def close_simulator(self, device=None, selected_android_option_name=None):
         """
         关闭安卓模拟器
         :return:
@@ -857,7 +866,7 @@ class MyFrame(wx.Frame):
         打开点赞配置面板
         :param event:
         """
-        self.new_frame = Click_ConfigFrame(None)
+        self.new_frame = ClickWindow(None)
         self.new_frame.Bind(wx.EVT_CLOSE, self.on_close_click_config_frame)
         self.new_frame.Show()
 
@@ -955,7 +964,7 @@ class MyFrame(wx.Frame):
                 time.sleep(1)
 
             device = self.devices_info[selected_android_option_name]["server"]
-            device_status = self.wait_device_full_start(device,selected_android_option_name)
+            device_status = self.wait_device_full_start(device, selected_android_option_name)
             if device_status:
                 self.before_start_control(selected_android_option_name)
         else:
@@ -979,7 +988,7 @@ class MyFrame(wx.Frame):
         if not self.current_click_num and not self.checked and not self.comment_checked:
             wx.MessageBox('1.请输入点赞次数\n2.选中点赞任务\n3.选择评论任务', '提示', wx.OK | wx.ICON_INFORMATION)
             return
-        elif self.current_click_num <= 0:
+        elif self.current_click_num and self.current_click_num <= 0:
             wx.MessageBox('点赞数量要大于0', '提示', wx.OK | wx.ICON_INFORMATION)
             return
 
@@ -1002,7 +1011,7 @@ class MyFrame(wx.Frame):
                 if self.devices_info.get(selected_android_option_name):
                     device = self.devices_info[selected_android_option_name]["server"]
                     if self.devices_info.get(selected_android_option_name, {}).get('task_status') == "accept":
-                        device_status = self.wait_device_full_start(device,selected_android_option_name)
+                        device_status = self.wait_device_full_start(device, selected_android_option_name)
                         if device_status:
                             self.before_start_control(selected_android_option_name)
                 else:
@@ -1034,20 +1043,20 @@ class MyFrame(wx.Frame):
             # 当只输入了点赞数量，没选择执行任务时
             if self.current_click_num:
                 self.total_click_num -= 1
-                self.start_thread(self.click_simulator_control, device, selected_android_option_name)
+                self.start_task(self.click_simulator_control, device, selected_android_option_name)
                 self.start_button.Disable()
                 self.pause_resume_button.SetLabel("暂停")
                 self.pause_resume_button.Enable()
                 self.stop_button.Enable()
             if self.checked:
                 self.click_date_start = datetime.now()
-                self.start_thread(self.click_task, device, selected_android_option_name)
+                self.start_task(self.click_task, device, selected_android_option_name)
                 self.start_button.Disable()
                 self.pause_resume_button.SetLabel("暂停")
                 self.pause_resume_button.Enable()
                 self.stop_button.Enable()
             if self.comment_checked:
-                self.start_thread(self.comment_control, device, selected_android_option_name)
+                self.start_task(self.comment_control, device, selected_android_option_name)
                 self.start_button.Disable()
                 self.pause_resume_button.SetLabel("暂停")
                 self.pause_resume_button.Enable()
@@ -1085,17 +1094,20 @@ class MyFrame(wx.Frame):
         """
         total_likes = 0
         self.batch_value += 1
+        stop_flag = self.devices_info[selected_android_option_name]["stop_flag"]
+        pause_flag = self.devices_info[selected_android_option_name]["pause_flag"]
         for i in range(self.current_click_num + 1):
             if hasattr(self, "global_click_num"):
                 self.global_click_num += 1
             total_likes += 1
             # 异步调用开始点赞，并传递参数total_likes
             wx.CallAfter(self.click_simulator, total_likes, device)
-            if self.stop_flag.is_set():
+
+            if stop_flag.is_set():
                 break
-            while self.pause_flag.is_set():
+            while pause_flag.is_set():
                 wx.MilliSleep(100)
-                if self.stop_flag.is_set():
+                if stop_flag.is_set():
                     break
             wx.MilliSleep(400)
 
@@ -1103,7 +1115,7 @@ class MyFrame(wx.Frame):
         if total_likes - 1 == self.current_click_num:
             if hasattr(self, "click_status_static_text"):
                 self.click_status_static_text.SetLabel(f"第{self.batch_value}批点赞任务，已完成。"
-                                                      f"成功：{total_likes - 1}个")
+                                                       f"成功：{total_likes - 1}个")
             else:
                 self.click_status_static_text = wx.StaticText(parent=self.panel,
                                                               label=f"第{self.batch_value}批点赞任务，已完成。"
@@ -1123,6 +1135,7 @@ class MyFrame(wx.Frame):
             if self.config_value == self.config_values[-1]:
                 self.pause_resume_button.Disable()
                 self.start_button.Enable()
+                self.devices_info[selected_android_option_name]["task_status"] = "accept"
         # 当是单次点击任务时
         else:
             self.pause_resume_button.Disable()
@@ -1136,6 +1149,7 @@ class MyFrame(wx.Frame):
         """
         if not hasattr(self, "self.config_values"):
             self.config_values = self.read_config()
+        wait_event = self.devices_info[selected_android_option_name]["wait_event"]
         for config_value in self.config_values:
             click_num_total = int(config_value[0])  # 点赞总量
             self.click_T = float(config_value[1])  # 点赞间隔
@@ -1161,13 +1175,13 @@ class MyFrame(wx.Frame):
                 time_cooling = 3
                 if time_cooling > 0:
                     # 等待time_cooling秒
-                    self.wait_event.wait(timeout=time_cooling)
-                    # 当取消按钮被点击，self.wait_event标记会为True，并取消上一步的等待，继续执行
-                    if self.wait_event.is_set():
-                        self.wait_event.clear()  # 重置事件状态
+                    wait_event.wait(timeout=time_cooling)
+                    # 当取消按钮被点击，wait_event标记会为True，并取消上一步的等待，继续执行
+                    if wait_event.is_set():
+                        wait_event.clear()  # 重置事件状态
                         break
                     else:
-                        self.wait_event.clear()  # 重置事件状态
+                        wait_event.clear()  # 重置事件状态
                 self.click_date_start = click_date_end
         self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
@@ -1198,14 +1212,14 @@ class MyFrame(wx.Frame):
         else:
             logger.info(f"第{total_likes}次点击失败")
 
-    def click_cancel_control(self, evt):
+    def cancel_control(self, evt):
         """
         取消按钮
             1.停止线程——点赞
             2.显示开始按钮
             3.禁用取消/暂停按钮
         """
-        self.stop_thread()
+        self.stop_task()
         self.start_button.Enable()
 
         self.stop_button.Disable()
@@ -1215,11 +1229,13 @@ class MyFrame(wx.Frame):
         """
         暂停/继续按钮
         """
-        if self.pause_flag.is_set():
-            self.pause_flag.clear()
+        selected_android_option_name = self.get_choice_android_device_name()
+        pause_flag = self.devices_info[selected_android_option_name]["pause_flag"]
+        if pause_flag.is_set():
+            pause_flag.clear()
             self.pause_resume_button.SetLabel("暂停")
         else:
-            self.pause_flag.set()
+            pause_flag.set()
             self.pause_resume_button.SetLabel("继续")
 
     def read_config(self):
@@ -1242,20 +1258,39 @@ class MyFrame(wx.Frame):
 
     def comment_control(self, device, selected_android_option_name):
         """
-        评论控件
+        评论控件（待完成：评论间隔，评论配置优化）
         """
         d = u2.connect(f"{device.serial}")
-        # 输入评论
-        d(resourceId="com.ss.android.ugc.aweme:id/f32").click()
-        d.send_keys("1", clear=True)
-        d(resourceId="com.ss.android.ugc.aweme:id/jcq").click()
+
+        excel_file = os.path.join(current_dir, 'config', 'comment_data.xlsx')
+        # 读取Excel文件
+        df = pd.read_excel(excel_file)
+        # 获取DataFrame的形状
+        num_rows, num_columns = df.shape
+
+        for i in range(3):
+            # 随机选择行和列的索引
+            random_row_index = random.randint(0, num_rows - 1)
+            random_column_index = random.randint(0, num_columns - 1)
+
+            # 获取随机单元格的数据
+            random_cell_data = df.iat[random_row_index, random_column_index]
+
+            # 输入评论
+            d(resourceId="com.ss.android.ugc.aweme:id/f32").click()
+            d(focused=True).set_text(f"{random_cell_data}")
+            d(resourceId="com.ss.android.ugc.aweme:id/jcq").click()
+
+        self.pause_resume_button.Disable()
+        self.start_button.Enable()
+        self.devices_info[selected_android_option_name]["task_status"] = "accept"
 
 
 if __name__ == '__main__':
     # 创建应用程序对象
     app = wx.App()
     # 创建窗口对象
-    frm = MyFrame(parent=None, title="飞播")
+    frm = FeiboFrame(parent=None, title="飞播")
     # 显示窗口
     frm.Show()
     # 进入主事件循环

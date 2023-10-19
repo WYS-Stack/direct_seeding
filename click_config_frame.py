@@ -4,7 +4,7 @@ import configparser
 
 
 # 配置页面
-class Click_ConfigFrame(wx.Frame):
+class ClickWindow(wx.Frame):
     def __init__(self, parent):
         super().__init__(parent, title='配置', size=(500, 250), pos=(900, 200))
 

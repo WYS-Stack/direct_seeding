@@ -170,6 +170,8 @@ class CommentWindow(QMainWindow):
         """
         # 创建一个表格部件
         table_widget = QTableWidget()
+        # 设置选中项的背景颜色为绿色
+        table_widget.setStyleSheet("QTableWidget::item:selected { background-color: #418F1F; }")
         # 加载数据到表格
         self.load_sheet(sheet_name, table_widget)
 

@@ -32,13 +32,15 @@ class DouYinRoom:
             logger.info("已进入直播间")
             self.enter_live_broadcast_event.set()
 
-    def is_in_live_room(self, d):
+    @staticmethod
+    def is_in_live_room(d):
         """
         检查是否已经在直播间
         """
         return d(resourceId="com.ss.android.ugc.aweme:id/c6+").exists
 
-    async def handle_popups(self, d):
+    @staticmethod
+    async def handle_popups(d):
         """
         处理可能出现的弹窗
         """
@@ -48,6 +50,33 @@ class DouYinRoom:
             d(resourceId="com.ss.android.ugc.aweme:id/k_y").click_exists()
         if d(resourceId="com.ss.android.ugc.aweme:id/io4").exists:
             d(resourceId="com.ss.android.ugc.aweme:id/q0").click_exists()
+        if d.xpath('//*[@resource-id="com.ss.android.ugc.aweme:id/content_layout"]').exists:
+            d(resourceId="com.ss.android.ugc.aweme:id/d05").click_exists()
+        if d(resourceId="com.android.permissioncontroller:id/content_container").exists:
+            d(resourceId="com.android.permissioncontroller:id/permission_allow_button").click_exists()
+        if d.xpath(
+                '//*[@resource-id="com.android.permissioncontroller:id/content_container"]/android.widget'
+                '.LinearLayout[1]').exists:
+            d(resourceId="com.android.permissioncontroller:id/permission_deny_button").click_exists()
+
+    async def login(self, d, phone:str, code:str):
+        """
+        登陆
+        """
+        # 手机号登陆
+        if d.xpath('//*[@resource-id="com.ss.android.ugc.aweme:id/aw"]/android.view.ViewGroup[1]').exists:
+            logger.info("进入登陆界面")
+            d(resourceId="com.ss.android.ugc.aweme:id/qc6").click_exists()
+            d(resourceId="com.ss.android.ugc.aweme:id/o_i").send_keys(phone)
+            d(resourceId="com.ss.android.ugc.aweme:id/hxh").click_exists()
+            if d.xpath('//android.widget.RelativeLayout/android.widget.FrameLayout[1]').exists:
+                self.on_task_completed("请打开模拟器手动验证")
+                if d.xpath('//android.widget.RelativeLayout/android.widget.FrameLayout[1]').wait_gone():
+                    d(resourceId="com.ss.android.ugc.aweme:id/tq3").send_keys(code)
+                    d(resourceId="com.ss.android.ugc.aweme:id/login").click_exists()
+        # 账号密码登陆
+        else:
+            pass
 
     async def enter_search_page(self, d):
         """
@@ -152,7 +181,7 @@ class DouYinRoom:
                     '//*[@resource-id="com.ss.android.ugc.aweme:id/lxd"]/android.widget.LinearLayout['
                     '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
                     '1]/android.widget.FrameLayout[1]/android.widget.FrameLayout['
-                    '1]/com.lynx.tasm.behavior.ui.view.UIView[3]').click_exists():
+                    '1]/com.lynx.tasm.behavior.ui.view.UIView[3]').click_exists(timeout=1.5):
                 enter_status = self.wait_full_enter_live_broadcast(d)
                 if enter_status:
                     logger.info("成功进入直播间")
@@ -170,7 +199,7 @@ class DouYinRoom:
             wx.CallAfter(self.on_task_completed, "未查询到账号直播信息")
 
     @staticmethod
-    def wait_full_enter_live_broadcast(d, timeout=10):
+    def wait_full_enter_live_broadcast(d, timeout=15):
         """
         等待完全进入直播间
         :param d: 连接设备服务
