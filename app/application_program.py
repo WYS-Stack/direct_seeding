@@ -32,7 +32,7 @@ class App_Program:
         self.url = application_package_name[self.app_name]["url"]
         self.package_name = application_package_name[self.app_name]["package_name"]
         # 下载状态
-        self.status_label = wx.StaticText(self.panel, label="", pos=((220, 40)))
+        self.status_label = wx.StaticText(self.panel, label="", pos=((300, 40)))
         logger.info(f"----------当前序列号：{serial}--------------------")
 
     @retry(wait_fixed=10000, stop_max_attempt_number=3) # 错误等十秒，重试只三次
@@ -137,23 +137,33 @@ class App_Program:
                             wx.CallAfter(self.update_status, "卸载成功")
                         else:
                             wx.CallAfter(self.update_status, "卸载失败")
-                        await self.start_download(version, download_url)
-                        await self.install_application_program(version)
+                        download_status = await self.start_download(version, download_url)
+                        if download_status:
+                            return await self.install_application_program(version)
+                        else:
+                            return False
                     else:
                         logger.info("App版本通过！")
+                        return True
                 else:
                     logger.info("未检测到本地版本")
+                    return False
             else:
                 logger.info("App最新版本和下载地址请求错误！")
+                return False
         # 应用程序不存在时 直接下载安装
         else:
             logger.info("APP状态：不存在")
             logger.info(f"最新apk地址：{download_url}")
             if version and download_url:
-                await self.start_download(version, download_url)
-                await self.install_application_program(version)
+                download_status = await self.start_download(version, download_url)
+                if download_status:
+                    return await self.install_application_program(version)
+                else:
+                    return False
             else:
                 logger.info("App最新版本和下载地址请求错误！")
+                return False
 
     def download_file(self, url, file_name):
         """
@@ -187,16 +197,19 @@ class App_Program:
         file_name = f"{self.app_name}_{version}.apk"
         if not os.path.isfile(file_name):
             try:
-                logger.info(f"开始下载{file_name}.apk")
+                logger.info(f"开始下载{file_name}")
                 # 下载进度条
                 self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40))
                 self.download_file(download_url, file_name)
+                return True
             except Exception as e:
                 logger.info(traceback.format_exc())
                 wx.CallAfter(self.update_status, f"下载失败: {str(e)}")
+                return False
         else:
             wx.CallAfter(self.update_status, "下载地址错误")
             logger.info("App下载地址错误")
+            return False
 
     def update_progress(self, progress):
         """
@@ -219,9 +232,11 @@ class App_Program:
         if self.install_status.replace("Performing Streamed Install", "").strip() == "Success":
             wx.CallAfter(self.update_status, "安装成功")
             logger.info("APP安装成功")
+            return True
         else:
             wx.CallAfter(self.update_status, "安装失败")
             logger.info("APP安装失败")
+            return False
 
     async def uninstall_application_program(self):
         """
@@ -307,8 +322,10 @@ class App_Program:
                 listen_running_status = self.check_application_program_running_status(listen=True)
                 if listen_running_status:
                     logger.info("APP启动成功")
+                    return True
                 else:
                     logger.info("APP启动失败！")
+                    return False
             else:
                 logger.info("APP启动失败！")
                 choice = wx.MessageBox('是否尝试重启', 'APP启动失败', wx.YES_NO | wx.ICON_QUESTION)
@@ -317,10 +334,13 @@ class App_Program:
                     start_application_program_status = subprocess.getoutput(cmd)
                     if start_application_program_status:
                         logger.info("APP启动成功")
+                        return True
                     else:
                         logger.info("APP启动失败！")
+                        return False
         else:
             logger.info(f"{self.app_name}已启动！")
+            return True
 
     async def start_atx_agent(self):
         """

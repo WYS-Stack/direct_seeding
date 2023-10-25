@@ -1,6 +1,7 @@
 import os
 import wx
 import configparser
+from config.project_root import ROOT_DIR
 
 
 # 配置页面
@@ -19,8 +20,7 @@ class ClickWindow(wx.Frame):
         ]
         # 读取配置文件获取结果
         config_read = configparser.ConfigParser()
-        current_parent_path = os.path.dirname(os.path.abspath(__file__))
-        config_read.read(current_parent_path+'/config/config.ini')
+        config_read.read(ROOT_DIR+'/config/config.ini')
         # 配置文件默认值
         default_values = []
         for section in config_read.sections():
@@ -65,9 +65,8 @@ class ClickWindow(wx.Frame):
             config[section_name]['interval'] = value[1]
             config[section_name]['time'] = value[2]
             config[section_name]['batch'] = value[3]
-        current_parent_path = os.path.dirname(os.path.abspath(__file__))
 
-        with open(current_parent_path + '/config/config.ini', 'w') as configfile:
+        with open(ROOT_DIR + '/config/config.ini', 'w') as configfile:
             config.write(configfile)
 
 

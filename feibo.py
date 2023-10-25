@@ -1,15 +1,15 @@
-import asyncio
-import configparser
-import functools
 import os
-import random
-import subprocess
-import threading
 import time
+import random
+import asyncio
+import functools
+import threading
+import subprocess
+import configparser
 
-import pandas as pd
 import wx
 import wx.adv
+import pandas as pd
 import uiautomator2 as u2
 from datetime import datetime
 
@@ -17,12 +17,11 @@ from PyQt5.QtWidgets import QApplication
 from ppadb.client import Client as AdbClient
 
 from logger import logger
-from application_program import App_Program
-from douyin_room import DouYinRoom
-from click_config_frame import ClickWindow
-from comment_config_frame import CommentWindow
-
-current_dir = os.path.dirname(__file__)
+from room.douyin_room import DouYinRoom
+from app.application_program import App_Program
+from config.project_root import ROOT_DIR
+from configframe.click_config_frame import ClickWindow
+from configframe.comment_config_frame import CommentWindow
 
 
 class FeiboFrame(wx.Frame):
@@ -33,9 +32,12 @@ class FeiboFrame(wx.Frame):
     id_help = wx.NewIdRef()
     id_about = wx.NewIdRef()
 
-    def __init__(self, parent, title):
-        super(FeiboFrame, self).__init__(parent, title=title, size=(500, 500), pos=(600, 200))
+    def __init__(self, parent, title, size):
+        super(FeiboFrame, self).__init__(parent, title=title, size=size, pos=(600, 200))
         self.Bind(wx.EVT_CLOSE, self.on_close_x)
+        # 设置窗口的最小和最大尺寸为固定值
+        self.SetMinSize(size)
+        self.SetMaxSize(size)
         # 创建一个面板，self设置当前所在的父容器为当前窗口对象
         self.panel = wx.Panel(self)
 
@@ -46,7 +48,7 @@ class FeiboFrame(wx.Frame):
         # 当前需要点赞的数量
         self.current_click_num = 0
         # 默认点击的坐标轴
-        self.click_X = 302
+        self.click_X = 450
         self.click_Y = 750
         # 默认点击间隔
         self.click_T = 0.1
@@ -57,7 +59,7 @@ class FeiboFrame(wx.Frame):
         # 历史记录面板
         self.history_popup = None
         # 历史记录文件
-        history_filename = os.path.join(current_dir, 'config', 'history.txt')
+        history_filename = os.path.join(ROOT_DIR, 'config', 'history.txt')
         self.history_filename = history_filename
         # 历史记录
         self.history_list = self.read_history(self.history_filename)
@@ -153,20 +155,26 @@ class FeiboFrame(wx.Frame):
         self.sb.SetStatusText(u'关于', 1)
 
     @staticmethod
-    def emulators_list():
+    def get_emulator_path():
+        # 获取当前用户的主目录
+        user_home = os.path.expanduser("~")
+        return os.path.join(user_home, "Library/Android/sdk/emulator/emulator")
+
+    def emulators_list(self):
         """
         模拟器列表
         :return: 所有的模拟器
         """
-        result = subprocess.run("/Users/wanghan/Library/Android/sdk/emulator/emulator -list-avds", shell=True,
-                                capture_output=True)
+        # 获取当前用户的主目录
+        emulator_path = self.get_emulator_path()
+        result = subprocess.run(f"{emulator_path} -list-avds", shell=True, capture_output=True)
         android_list = result.stdout.decode().strip().split("\n")
         return android_list
 
     def control_dynamic_loading(self):
         """初始化动态加载控件（扩展）"""
         self.animation = wx.adv.AnimationCtrl(self.panel)
-        loading_path = os.path.join(current_dir, 'img', 'Spinner-1s-30px.gif')
+        loading_path = os.path.join(ROOT_DIR, 'img', 'Spinner-1s-30px.gif')
         self.animation.LoadFile(loading_path)
         self.animation.SetPosition((400, 6))
         self.animation.Play()
@@ -203,9 +211,9 @@ class FeiboFrame(wx.Frame):
 
         # 初始化状态栏信息
         if android_list:
-            self.sb.SetStatusText(f'模拟器信息:{android_list[0]}', 0)
-            self.sb.SetStatusText('', 1)
-            self.sb.SetStatusText('状态信息:未启动', 2)
+            wx.CallAfter(self.sb.SetStatusText, f'模拟器信息:{android_list[0]}', 0)
+            wx.CallAfter(self.sb.SetStatusText, '', 1)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:未启动', 2)
 
         self.input_id_text = wx.StaticText(parent=self.panel, label="请输入ID：", pos=(10, 70))
         self.input_id = wx.TextCtrl(self.panel, pos=(140, 68), size=(200, -1), style=wx.TE_PROCESS_ENTER)
@@ -587,7 +595,7 @@ class FeiboFrame(wx.Frame):
         """
         展示启动按钮
         """
-        self.sb.SetStatusText('状态信息:未启动', 2)
+        wx.CallAfter(self.sb.SetStatusText, '状态信息:未启动', 2)
         if hasattr(self, "Reconnect_button"):
             self.Reconnect_button.SetLabel("启动")
         else:
@@ -598,7 +606,7 @@ class FeiboFrame(wx.Frame):
         """
         展示关闭按钮
         """
-        self.sb.SetStatusText('状态信息:已启动', 2)
+        wx.CallAfter(self.sb.SetStatusText, '状态信息:已启动', 2)
         if hasattr(self, "Reconnect_button"):
             self.Reconnect_button.SetLabel("关闭")
         else:
@@ -705,7 +713,7 @@ class FeiboFrame(wx.Frame):
                     break
             else:
                 self.animation.Show()
-                self.sb.SetStatusText('状态信息:关闭中', 2)
+                wx.CallAfter(self.sb.SetStatusText, '状态信息:关闭中', 2)
                 self.switch_on_button()
                 break
 
@@ -736,31 +744,31 @@ class FeiboFrame(wx.Frame):
         # 未启动
         if status == "unstarted":
             self.animation.Show()
-            self.sb.SetStatusText('状态信息:启动中', 2)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:启动中', 2)
             # 异步调用开启模拟器
             start_simulator = functools.partial(self.start_simulator, selected_android_option_name)
             asyncio.run(start_simulator())
             # 异步监听开启状态
             threading.Thread(target=self.listener_start_thread, args=(selected_android_option_name,)).start()
         elif status == "starting":
-            self.sb.SetStatusText('状态信息:启动中', 2)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:启动中', 2)
         elif status == "started":
             self.animation.Hide()
-            self.sb.SetStatusText('状态信息:已启动', 2)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:已启动', 2)
             self.switch_off_button()
         #    status == "unstarting"
         else:
             self.animation.Show()
-            self.sb.SetStatusText('状态信息:关闭中', 2)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:关闭中', 2)
             self.switch_on_button()
 
-    @staticmethod
-    async def start_simulator(selected_android_option_name):
+    async def start_simulator(self, selected_android_option_name):
         """
         开启安卓模拟器
         """
+        emulator_path = self.get_emulator_path()
         await asyncio.create_subprocess_shell(
-            f'/Users/wanghan/Library/Android/sdk/emulator/emulator -avd {selected_android_option_name}',
+            f'{emulator_path} -avd {selected_android_option_name}',
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -843,7 +851,7 @@ class FeiboFrame(wx.Frame):
             # 启动中
             else:
                 self.animation.Show()
-                self.sb.SetStatusText('状态信息:启动中', 2)
+                wx.CallAfter(self.sb.SetStatusText, '状态信息:启动中', 2)
                 self.switch_off_button()
                 break
 
@@ -868,20 +876,20 @@ class FeiboFrame(wx.Frame):
         status = self.check_device_in_adb_devices(selected_android_option_name)
         if status == 'started':
             self.animation.Show()
-            self.sb.SetStatusText('状态信息:关闭中', 2)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:关闭中', 2)
             # 异步调用关闭模拟器
             asyncio.run(self.close_simulator(selected_android_option_name=selected_android_option_name))
             # 异步监听关闭状态
             threading.Thread(target=self.listener_stop_thread, args=(selected_android_option_name,)).start()
         elif status == 'unstarting':
-            self.sb.SetStatusText('状态信息:关闭中', 2)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:关闭中', 2)
         elif status == 'unstarted':
             self.animation.Hide()
             self.switch_on_button()
         #   status == 'starting'
         else:
             self.animation.Show()
-            self.sb.SetStatusText('状态信息:开启中', 2)
+            wx.CallAfter(self.sb.SetStatusText, '状态信息:启动中', 2)
             self.switch_off_button()
 
     async def close_simulator(self, device=None, selected_android_option_name=None):
@@ -952,60 +960,19 @@ class FeiboFrame(wx.Frame):
         await app.start_atx_agent()
         await asyncio.sleep(1)
         # 检查应用程序
-        await app.check_application_program()
-        # 启动应用程序
-        await app.start_application_program()
+        check_status = await app.check_application_program()
+        if check_status:
+            # 启动应用程序
+            activate_status = await app.start_application_program()
+            if activate_status:
+                return app
 
-        return app
-
-    def wait_device_full_start(self, device, selected_android_option_name, timeout=30):
+    def start_control(self, evt):
         """
-        等待模拟器完全启动
-        :param selected_android_option_name: 当前模拟器名称
-        :param device: 模拟器服务
-        :param timeout: 最大等待时间（秒）
-        :return: 是否成功
+        开始控件
         """
-        self.devices_info[selected_android_option_name]["task_status"] = "reject"
-        cmd = f'adb -s {device.serial} shell getprop sys.boot_completed'
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            output = subprocess.getoutput(cmd)
-            if output == "1":
-                logger.info("设备已完成启动")
-                return True
-            logger.info("启动中...")
-            time.sleep(2)
-
-        logger.warning("设备启动超时")
-        return False
-
-    def wait_device_start(self, selected_android_option_name, timeout=30):
-        """
-        启动并等待模拟器启动
-        :param selected_android_option_name: 选中的安卓模拟器名称
-        :param timeout: 最大等待时间（秒）
-        """
-        choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
-        start_time = time.time()
-        if choice == wx.YES:
-            self.devices_info[selected_android_option_name]["task_status"] = "reject"
-            # 启动
-            self.start_device(None)
-
-            while time.time() - start_time < timeout:
-                if self.devices_info.get(selected_android_option_name).get("server"):
-                    break
-                logger.info("等待启动中...")
-                time.sleep(1)
-
-            device = self.devices_info[selected_android_option_name]["server"]
-            device_status = self.wait_device_full_start(device, selected_android_option_name)
-            if device_status:
-                self.before_start_control(selected_android_option_name)
-        else:
-            self.devices_info[selected_android_option_name]["task_status"] = "accept"
+        # 开始前准备工作
+        threading.Thread(target=self.before_start_control_check).start()
 
     def before_start_control_check(self):
         """
@@ -1058,6 +1025,55 @@ class FeiboFrame(wx.Frame):
             if task_status == "accept":
                 self.wait_device_start(selected_android_option_name)
 
+    def wait_device_full_start(self, device, selected_android_option_name, timeout=30):
+        """
+        等待模拟器完全启动
+        :param selected_android_option_name: 当前模拟器名称
+        :param device: 模拟器服务
+        :param timeout: 最大等待时间（秒）
+        :return: 是否成功
+        """
+        self.devices_info[selected_android_option_name]["task_status"] = "reject"
+        cmd = f'adb -s {device.serial} shell getprop sys.boot_completed'
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            output = subprocess.getoutput(cmd)
+            if output == "1":
+                logger.info("设备已完成启动")
+                return True
+            logger.info("启动中...")
+            time.sleep(2)
+
+        logger.warning("设备启动超时")
+        return False
+
+    def wait_device_start(self, selected_android_option_name, timeout=30):
+        """
+        启动并等待模拟器启动
+        :param selected_android_option_name: 选中的安卓模拟器名称
+        :param timeout: 最大等待时间（秒）
+        """
+        choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
+        start_time = time.time()
+        if choice == wx.YES:
+            self.devices_info[selected_android_option_name]["task_status"] = "reject"
+            # 启动
+            self.start_device(None)
+
+            while time.time() - start_time < timeout:
+                if self.devices_info.get(selected_android_option_name).get("server"):
+                    break
+                logger.info("等待启动中...")
+                time.sleep(1)
+
+            device = self.devices_info[selected_android_option_name]["server"]
+            device_status = self.wait_device_full_start(device, selected_android_option_name)
+            if device_status:
+                self.before_start_control(selected_android_option_name)
+        else:
+            self.devices_info[selected_android_option_name]["task_status"] = "accept"
+
     async def before_start(self, selected_android_option_name):
         """
         完成启动app、进入直播间、开始点赞
@@ -1067,28 +1083,29 @@ class FeiboFrame(wx.Frame):
         device = self.devices_info[selected_android_option_name]["server"]
         # 启动应用程序
         app = await self.application_program_main(device)
-        await asyncio.sleep(3)  # 给予app启动一定的加载时间
-        # 进入直播间事件
-        enter_live_broadcast_event = threading.Event()
-        if self.Application_program_name == "抖音":
-            douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event)
-            await douyin.enter_live_broadcast_room()
-        else:  # 小红书
-            await self.enter_xiaohongshu_live_broadcast_room()
-        # 等待进入直播间
-        if enter_live_broadcast_event.wait(timeout=3):
-            # 当只输入了点赞数量，没选择执行任务时
-            if self.current_click_num:
-                self.total_click_num -= 1
-                self.start_task(self.click_simulator_control, device, selected_android_option_name)
-            if self.checked:
-                self.click_date_start = datetime.now()
-                self.start_task(self.click_task, device, selected_android_option_name)
-            if self.comment_checked:
-                self.start_task(self.comment_control, device, selected_android_option_name)
-        else:
-            self.devices_info[selected_android_option_name]['task_status'] = 'accept'
-            wx.CallAfter(self.on_task_completed, "直播间进入失败")
+        if app:
+            await asyncio.sleep(3)  # 给予app启动一定的加载时间
+            # 进入直播间事件
+            enter_live_broadcast_event = threading.Event()
+            if self.Application_program_name == "抖音":
+                douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event)
+                await douyin.enter_live_broadcast_room()
+            else:  # 小红书
+                await self.enter_xiaohongshu_live_broadcast_room()
+            # 等待进入直播间
+            if enter_live_broadcast_event.wait(timeout=3):
+                # 当只输入了点赞数量，没选择执行任务时
+                if self.current_click_num:
+                    self.total_click_num -= 1
+                    self.start_task(self.click_simulator_control, device, selected_android_option_name)
+                if self.checked:
+                    self.click_date_start = datetime.now()
+                    self.start_task(self.click_task, device, selected_android_option_name)
+                if self.comment_checked:
+                    self.start_task(self.comment_control, device, selected_android_option_name)
+            else:
+                self.devices_info[selected_android_option_name]['task_status'] = 'accept'
+                wx.CallAfter(self.on_task_completed, "直播间进入失败")
 
     def before_start_control(self, selected_android_option_name):
         """
@@ -1100,13 +1117,6 @@ class FeiboFrame(wx.Frame):
         before_start = functools.partial(self.before_start, selected_android_option_name)
         start_loop.run_until_complete(self.process_concurrent(before_start))  # run_until_complete：等待运行完毕
         start_loop.close()  # 关闭事件循环
-
-    def start_control(self, evt):
-        """
-        开始控件
-        """
-        # 开始前准备工作
-        threading.Thread(target=self.before_start_control_check).start()
 
     def click_simulator_control(self, device, selected_android_option_name):
         """
@@ -1200,10 +1210,9 @@ class FeiboFrame(wx.Frame):
                 self.click_simulator_control(device, selected_android_option_name)
                 # 点赞结束后，需要冷却时间
                 click_date_end = datetime.now()
-                # TODO 正式环境打开
-                # time_cooling = (round(click_time_total / click_batch_total)) - (
-                #             click_date_end - self.click_date_start).seconds
-                time_cooling = 3
+                time_cooling = (round(click_time_total / click_batch_total)) - (
+                            click_date_end - self.click_date_start).seconds
+                # time_cooling = 3
                 if time_cooling > 0:
                     # 等待time_cooling秒
                     is_running.clear()
@@ -1284,7 +1293,7 @@ class FeiboFrame(wx.Frame):
         :return: 文件默认数据
         """
         config_read = configparser.ConfigParser()
-        config_path = os.path.join(current_dir, 'config', 'config.ini')
+        config_path = os.path.join(ROOT_DIR, 'config', 'config.ini')
         config_read.read(config_path)
         # 配置文件默认值
         default_values = []
@@ -1302,7 +1311,7 @@ class FeiboFrame(wx.Frame):
         """
         d = u2.connect(f"{device.serial}")
 
-        excel_file = os.path.join(current_dir, 'config', 'comment_data.xlsx')
+        excel_file = os.path.join(ROOT_DIR, 'config', 'comment_data.xlsx')
         # 读取Excel文件
         df = pd.read_excel(excel_file)
         # 获取DataFrame的形状
@@ -1330,7 +1339,7 @@ if __name__ == '__main__':
     # 创建应用程序对象
     app = wx.App()
     # 创建窗口对象
-    frm = FeiboFrame(parent=None, title="飞播")
+    frm = FeiboFrame(parent=None, title="飞播", size=(500, 500))
     # 显示窗口
     frm.Show()
     # 进入主事件循环
