@@ -4,7 +4,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import *
 import openpyxl
 from PyQt5.QtCore import Qt, QEvent
-from config.project_root import ROOT_DIR
+from config.root_directory import ROOT_DIR
 
 
 class CommentWindow(QMainWindow):

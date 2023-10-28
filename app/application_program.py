@@ -35,7 +35,7 @@ class App_Program:
         self.status_label = wx.StaticText(self.panel, label="", pos=((300, 40)))
         logger.info(f"----------当前序列号：{serial}--------------------")
 
-    @retry(wait_fixed=10000, stop_max_attempt_number=3) # 错误等十秒，重试只三次
+    @retry(wait_fixed=1000, stop_max_attempt_number=3) # 错误等十秒，重试只三次
     async def request_latest_download_info(self):
         """
         请求最新的下载信息
@@ -44,22 +44,25 @@ class App_Program:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
                           "Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.69"
         }
-        try:
-            timeout = aiohttp.ClientTimeout(total=10)  # 设置超时时间为10秒
-            conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
-            async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
-                async with session.get(self.url, headers=self.headers) as response:
-                    if response.status == 200:
-                        data = await response.text()
-                        # 使用lxml解析页面内容
-                        tree = html.fromstring(data)
-                        version_element = tree.xpath('/html/body/div[3]/main/div[1]/div/span[3]/span')[0]
-                        version = version_element.text_content()
-                        download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
-                        return version, download_url
-        except Exception as e:
-            logger.error(traceback.print_exc())
-            return None, None
+        retry_count = 0  # 用于跟踪重试次数
+        while retry_count < 3:
+            try:
+                timeout = aiohttp.ClientTimeout(total=10)  # 设置超时时间为10秒
+                conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
+                async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
+                    async with session.get(self.url, headers=self.headers) as response:
+                        if response.status == 200:
+                            data = await response.text()
+                            # 使用lxml解析页面内容
+                            tree = html.fromstring(data)
+                            version_element = tree.xpath('/html/body/div[3]/main/div[1]/div/span[3]/span')[0]
+                            version = version_element.text_content()
+                            download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
+                            return version, download_url
+            except Exception as e:
+                logger.error(traceback.print_exc())
+                retry_count += 1  # 增加重试次数
+        return None, None  # 达到最大重试次数时返回 None, None 进行跳过
 
     async def check_application_version(self, timeout=30):
         """
@@ -74,7 +77,7 @@ class App_Program:
         while time.time() - start_time < timeout:
             application_version = subprocess.getoutput(cmd)
             logger.info(f"App本地版本：{application_version}")
-            logger.info(f"{cmd}")
+            # logger.info(f"{cmd}")
 
             if "." in application_version:
                 return application_version
@@ -118,7 +121,7 @@ class App_Program:
         检查设备是否有该应用程序
         """
         cmd = f'adb -s {self.serial} shell pm list packages | grep {self.package_name}'
-        logger.info(f"检查App是否存在：{cmd}")
+        # logger.info(f"检查App是否存在：{cmd}")
         Application_program_status = subprocess.getoutput(cmd)
         version, download_url = await self.request_latest_download_info()
         logger.info(f"App最新版本：{version}")
@@ -227,7 +230,7 @@ class App_Program:
         :param version: 版本 
         """
         cmd = f'adb -s {self.serial} install -r ./{self.app_name}_{version}.apk'
-        logger.info(f"开始安装App：{cmd}")
+        logger.info(f"开始安装App...")
         self.install_status = subprocess.getoutput(cmd)
         if self.install_status.replace("Performing Streamed Install", "").strip() == "Success":
             wx.CallAfter(self.update_status, "安装成功")
@@ -262,7 +265,7 @@ class App_Program:
         检查wifi状态
         """
         cmd = f'adb -s {self.serial} shell dumpsys wifi | grep "Wi-Fi is"'
-        logger.info(f"检测设备网络状态：{cmd}")
+        # logger.info(f"检测设备网络状态：{cmd}")
         wifi_status = subprocess.getoutput(cmd).strip("Wi-Fi is ")
         if wifi_status == "enabled":
             logger.info("当前网络状态：已连接")
@@ -287,7 +290,7 @@ class App_Program:
         :return: 应用程序是否在运行中
         """
         cmd = f'adb -s {self.serial} shell pidof -s {self.package_name}'
-        logger.info(f"检测APP运行状态：{cmd}")
+        # logger.info(f"检测APP运行状态：{cmd}")
         running_status = subprocess.getoutput(cmd)
         if running_status:
             return True  # 应用程序在运行中
@@ -314,7 +317,7 @@ class App_Program:
         running_status = self.check_application_program_running_status()
         if not running_status:
             cmd = f'adb -s {self.serial} shell am start -n {self.Activity_name}'
-            logger.info(f"启动{self.app_name}APP：{cmd}")
+            # logger.info(f"启动{self.app_name}APP：{cmd}")
             start_application_program_status = subprocess.getoutput(cmd)
 
             if start_application_program_status:

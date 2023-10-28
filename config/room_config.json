@@ -1,0 +1,45 @@
+{
+  "popup": {
+    "弹窗1": "com.ss.android.ugc.aweme:id/jh",
+    "关闭1": "com.ss.android.ugc.aweme:id/close",
+    "弹窗2": "com.ss.android.ugc.aweme:id/rxd",
+    "关闭2": "com.ss.android.ugc.aweme:id/k_y",
+    "弹窗3": "com.ss.android.ugc.aweme:id/io4",
+    "关闭3": "com.ss.android.ugc.aweme:id/q0",
+    "弹窗4": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/content_layout\"]",
+    "关闭4": "com.ss.android.ugc.aweme:id/d05",
+    "弹窗5": "com.android.permissioncontroller:id/content_container",
+    "关闭5": "com.android.permissioncontroller:id/permission_allow_button",
+    "弹窗6": "//*[@resource-id=\"com.android.permissioncontroller:id/content_container\"]/android.widget.LinearLayout[1]",
+    "关闭6": "com.android.permissioncontroller:id/permission_deny_button"
+  },
+  "phone_login_page": {
+    "登陆界面1": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/aw\"]/android.view.ViewGroup[1]",
+    "操作1": "com.ss.android.ugc.aweme:id/qc6",
+    "操作2": "com.ss.android.ugc.aweme:id/o_i",
+    "操作3": "com.ss.android.ugc.aweme:id/hxh",
+    "手动验证": "//android.widget.RelativeLayout/android.widget.FrameLayout[1]",
+    "输入验证码": "com.ss.android.ugc.aweme:id/tq3",
+    "登录按钮": "com.ss.android.ugc.aweme:id/login"
+  },
+  "password_login_page": {
+
+  },
+  "search_page": {
+    "搜索页面1": "com.ss.android.ugc.aweme:id/j1+",
+    "搜索页面2": "com.ss.android.ugc.aweme:id/xkp",
+    "搜索页面3": "com.ss.android.ugc.aweme:id/o2z",
+    "账号头像": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.view.UIView[3]",
+    "直播主窗口": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[2]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.LynxFlattenUI[3]"
+  },
+  "account_info_page": {
+    "直播标识": "com.ss.android.ugc.aweme:id/k_8",
+    "右上角按钮": "com.ss.android.ugc.aweme:id/vcj",
+    "id信息": "com.ss.android.ugc.aweme:id/re+"
+  },
+  "live_broadcast_page": {
+    "直播页面1": "com.ss.android.ugc.aweme:id/cw",
+    "直播页面2": "com.ss.android.ugc.aweme:id/uej",
+    "关闭按钮": "com.ss.android.ugc.aweme:id/c6+"
+  }
+}

@@ -1,7 +1,7 @@
 import os
 import wx
 import configparser
-from config.project_root import ROOT_DIR
+from config.root_directory import ROOT_DIR
 
 
 # 配置页面
@@ -20,7 +20,7 @@ class ClickWindow(wx.Frame):
         ]
         # 读取配置文件获取结果
         config_read = configparser.ConfigParser()
-        config_read.read(ROOT_DIR+'/config/config.ini')
+        config_read.read(ROOT_DIR+'/config/click_config.ini')
         # 配置文件默认值
         default_values = []
         for section in config_read.sections():
@@ -53,12 +53,12 @@ class ClickWindow(wx.Frame):
         self.config_values = [control.GetValue() for control in self.input_controls]
 
         # 将值转换成所需的形式
-        self.config_values_output = [
+        config_values_output = [
             (self.config_values[i], self.config_values[i + 1], self.config_values[i + 2], self.config_values[i + 3]) for
             i in range(0, len(self.config_values), 4)]
         # 将转换后的值写入配置文件
         config = configparser.ConfigParser()
-        for i, value in enumerate(self.config_values_output):
+        for i, value in enumerate(config_values_output):
             section_name = f'Section{i + 1}'
             config[section_name] = {}
             config[section_name]['num'] = value[0]
@@ -66,8 +66,9 @@ class ClickWindow(wx.Frame):
             config[section_name]['time'] = value[2]
             config[section_name]['batch'] = value[3]
 
-        with open(ROOT_DIR + '/config/config.ini', 'w') as configfile:
+        with open(ROOT_DIR + '/config/click_config.ini', 'w') as configfile:
             config.write(configfile)
+        return config_values_output
 
 
 if __name__ == '__main__':
