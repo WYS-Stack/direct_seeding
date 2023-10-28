@@ -30,3 +30,6 @@ pyinstaller --windowed --icon=app.icns feibo.py --add-data "config:config" --add
 ```shell
 weditor
 ```
+
+# 说明
+程序界面ID内容为：点击直播账号右上角...下方显示出来的账号为准
