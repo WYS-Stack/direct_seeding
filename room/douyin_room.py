@@ -14,7 +14,8 @@ from room.element_init import (
     element_click_exists,
     element_send_keys,
     element_set_text,
-    element_click, element_get_text
+    element_click,
+    element_get_text, element_description
 )
 
 class DouYinRoom:
@@ -26,7 +27,7 @@ class DouYinRoom:
 
     async def enter_live_broadcast_room(self):
         """
-        进入抖音直播间的主函数
+        进入直播间的主函数
         """
         d = u2.connect(f"{self.device.serial}")
         await self.enter_room(d)
@@ -50,7 +51,7 @@ class DouYinRoom:
         # 读取JSON配置文件
         config_path = os.path.join(ROOT_DIR, "config", "room_config.json")
         with open(config_path, 'r') as json_file:
-            config_data = json.load(json_file)
+            config_data = json.load(json_file)["douyin"]
         return config_data
 
     @staticmethod
@@ -63,15 +64,18 @@ class DouYinRoom:
 
     async def handle_popups(self, d):
         """
-        处理可能出现的弹窗
+        处理打开应用时可能出现的弹窗
         """
         popup = self.config_data.get("popup", {})
         await DouYinRoom.process_popup(d, popup["弹窗1"], popup["关闭1"])
-        await DouYinRoom.process_popup(d, popup["弹窗2"], popup["关闭2"])
-        await DouYinRoom.process_popup(d, popup["弹窗3"], popup["关闭3"])
+        await DouYinRoom.process_popup(d, popup["检测到更新（弹窗）"], popup["以后再说（按钮）"])
+        await DouYinRoom.process_popup(d, popup["抖音想访问你的通讯录"], popup["拒绝访问通讯录"])
         await DouYinRoom.process_popup(d, popup["弹窗4"], popup["关闭4"], use_xpath=True)
         await DouYinRoom.process_popup(d, popup["弹窗5"], popup["关闭5"])
         await DouYinRoom.process_popup(d, popup["弹窗6"], popup["关闭6"], use_xpath=True)
+        await DouYinRoom.process_popup(d, popup["抖音没有响应"], popup["等待响应"])
+        if element_exists(d, popup["添加搜索到桌面"], use_xpath=True):
+            element_description(d, popup["关闭添加搜索弹窗"])
 
     async def login(self, d, phone: str, code: str, config_data):
         """
@@ -98,9 +102,7 @@ class DouYinRoom:
         进入搜索页面
         """
         search_page = self.config_data.get("search_page", {})
-        if element_wait(d, search_page["搜索页面1"]) or \
-                element_wait(d, search_page["搜索页面2"]) or \
-                element_wait(d, search_page["搜索页面3"]):
+        if element_wait(d, search_page["搜索页面1"]) or element_wait(d, search_page["搜索页面2"]) or element_wait(d, search_page["搜索页面3"]):
             if element_click_exists(d, search_page["搜索页面1"]):
                 await self.enter_home_page(d)
             elif element_exists(d, search_page["搜索页面2"]):
@@ -130,7 +132,7 @@ class DouYinRoom:
         进入搜索结果页面
         """
         logger.info("确定当前为搜索页面")
-        d(focused=True).set_text(f"{self.app_id}")  # 输入ID
+        element_set_text(d, self.app_id)  # 输入ID
         logger.info("已输入ID")
         # await self.enter_live_broadcast_page(d)
 
@@ -204,8 +206,8 @@ class DouYinRoom:
                     logger.info("成功进入直播间")
                     self.enter_live_broadcast_event.set()
             else:
-                logger.info("未搜索到账号直播信息")
-                wx.CallAfter(self.on_task_completed, "未搜索到账号直播信息")
+                logger.info("账号未直播")
+                wx.CallAfter(self.on_task_completed, "账号未直播")
         elif element_click_exists(d, search_page["搜索页面3"]):
             enter_status = self.wait_full_enter_live_broadcast(d)
             if enter_status:

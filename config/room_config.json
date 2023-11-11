@@ -1,45 +1,118 @@
 {
-  "popup": {
-    "弹窗1": "com.ss.android.ugc.aweme:id/jh",
-    "关闭1": "com.ss.android.ugc.aweme:id/close",
-    "弹窗2": "com.ss.android.ugc.aweme:id/rxd",
-    "关闭2": "com.ss.android.ugc.aweme:id/k_y",
-    "弹窗3": "com.ss.android.ugc.aweme:id/io4",
-    "关闭3": "com.ss.android.ugc.aweme:id/q0",
-    "弹窗4": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/content_layout\"]",
-    "关闭4": "com.ss.android.ugc.aweme:id/d05",
-    "弹窗5": "com.android.permissioncontroller:id/content_container",
-    "关闭5": "com.android.permissioncontroller:id/permission_allow_button",
-    "弹窗6": "//*[@resource-id=\"com.android.permissioncontroller:id/content_container\"]/android.widget.LinearLayout[1]",
-    "关闭6": "com.android.permissioncontroller:id/permission_deny_button"
+  "douyin": {
+    "popup": {
+      "弹窗1": "com.ss.android.ugc.aweme:id/jh",
+      "关闭1": "com.ss.android.ugc.aweme:id/close",
+      "检测到更新（弹窗）": "com.ss.android.ugc.aweme:id/rxd",
+      "以后再说（按钮）": "com.ss.android.ugc.aweme:id/k_y",
+      "抖音想访问你的通讯录": "com.ss.android.ugc.aweme:id/io4",
+      "拒绝访问通讯录": "com.ss.android.ugc.aweme:id/q0",
+      "弹窗4": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/content_layout\"]",
+      "关闭4": "com.ss.android.ugc.aweme:id/d05",
+      "弹窗5": "com.android.permissioncontroller:id/content_container",
+      "关闭5": "com.android.permissioncontroller:id/permission_allow_button",
+      "弹窗6": "//*[@resource-id=\"com.android.permissioncontroller:id/content_container\"]/android.widget.LinearLayout[1]",
+      "关闭6": "com.android.permissioncontroller:id/permission_deny_button",
+      "抖音没有响应": "android:id/topPanel",
+      "等待响应": "android:id/aerr_wait",
+      "关闭应用": "android:id/aerr_close",
+      "添加搜索到桌面": "//*[@resource-id=\"android:id/content\"]/android.view.ViewGroup[1]/android.view.ViewGroup[1]/android.view.ViewGroup[1]/android.view.ViewGroup[1]",
+      "关闭添加搜索弹窗": "关闭弹窗按钮"
+    },
+    "phone_login_page": {
+      "登陆界面1": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/aw\"]/android.view.ViewGroup[1]",
+      "操作1": "com.ss.android.ugc.aweme:id/qc6",
+      "操作2": "com.ss.android.ugc.aweme:id/o_i",
+      "操作3": "com.ss.android.ugc.aweme:id/hxh",
+      "手动验证": "//android.widget.RelativeLayout/android.widget.FrameLayout[1]",
+      "输入验证码": "com.ss.android.ugc.aweme:id/tq3",
+      "登录按钮": "com.ss.android.ugc.aweme:id/login"
+    },
+    "password_login_page": {
+    },
+    "search_page": {
+      "搜索页面1": "com.ss.android.ugc.aweme:id/j1+",
+      "搜索页面2": "com.ss.android.ugc.aweme:id/xkp",
+      "搜索页面3": "com.ss.android.ugc.aweme:id/o2z",
+      "账号头像": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.view.UIView[3]",
+      "直播主窗口": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[2]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.LynxFlattenUI[3]"
+    },
+    "account_info_page": {
+      "直播标识": "com.ss.android.ugc.aweme:id/k_8",
+      "右上角按钮": "com.ss.android.ugc.aweme:id/vcj",
+      "id信息": "com.ss.android.ugc.aweme:id/re+"
+    },
+    "live_broadcast_page": {
+      "直播页面1": "com.ss.android.ugc.aweme:id/cw",
+      "直播页面2": "com.ss.android.ugc.aweme:id/uej",
+      "关闭按钮": "com.ss.android.ugc.aweme:id/c6+",
+      "评论输入框": "com.ss.android.ugc.aweme:id/f32",
+      "发送评论按钮": "com.ss.android.ugc.aweme:id/jcq"
+    }
   },
-  "phone_login_page": {
-    "登陆界面1": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/aw\"]/android.view.ViewGroup[1]",
-    "操作1": "com.ss.android.ugc.aweme:id/qc6",
-    "操作2": "com.ss.android.ugc.aweme:id/o_i",
-    "操作3": "com.ss.android.ugc.aweme:id/hxh",
-    "手动验证": "//android.widget.RelativeLayout/android.widget.FrameLayout[1]",
-    "输入验证码": "com.ss.android.ugc.aweme:id/tq3",
-    "登录按钮": "com.ss.android.ugc.aweme:id/login"
-  },
-  "password_login_page": {
+  "xiaohongshu": {
+    "popup": {
+      "服务条款": "com.xingin.xhs:id/dce",
+      "同意条款": "com.xingin.xhs:id/ge",
+      "系统通知": "com.android.permissioncontroller:id/content_container",
+      "开启系统通知": "com.android.permissioncontroller:id/permission_allow_button",
+      "关闭系统通知": "com.android.permissioncontroller:id/permission_deny_button",
 
-  },
-  "search_page": {
-    "搜索页面1": "com.ss.android.ugc.aweme:id/j1+",
-    "搜索页面2": "com.ss.android.ugc.aweme:id/xkp",
-    "搜索页面3": "com.ss.android.ugc.aweme:id/o2z",
-    "账号头像": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.view.UIView[3]",
-    "直播主窗口": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[2]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.LynxFlattenUI[3]"
-  },
-  "account_info_page": {
-    "直播标识": "com.ss.android.ugc.aweme:id/k_8",
-    "右上角按钮": "com.ss.android.ugc.aweme:id/vcj",
-    "id信息": "com.ss.android.ugc.aweme:id/re+"
-  },
-  "live_broadcast_page": {
-    "直播页面1": "com.ss.android.ugc.aweme:id/cw",
-    "直播页面2": "com.ss.android.ugc.aweme:id/uej",
-    "关闭按钮": "com.ss.android.ugc.aweme:id/c6+"
+      "未开启通知时推荐的弹窗": "//*[@resource-id=\"com.xingin.xhs:id/dra\"]/android.widget.LinearLayout[1]",
+      "关闭推荐弹窗": "com.xingin.xhs:id/c8d",
+      "同意推荐弹窗": "com.xingin.xhs:id/c9r",
+
+      "兴趣弹窗": "//android.widget.FrameLayout[2]",
+      "兴趣弹窗（替代）": "com.xingin.xhs:id/c4b",
+      "跳过兴趣弹窗": "com.xingin.xhs:id/c40",
+      "同意兴趣弹窗": "com.xingin.xhs:id/c8j",
+
+      "升级完整版":"com.xingin.xhs:id/ai5",
+      "关闭升级窗口": "com.xingin.xhs:id/ai4",
+
+      "电话授权": "com.android.permissioncontroller:id/content_container",
+      "拒绝电话授权": "com.android.permissioncontroller:id/permission_deny_button",
+
+      "优惠券 (进入直播间可能出现的弹窗)": "//*[@resource-id=\"app\"]/android.view.View[1]/android.view.View[1]/android.view.View[1]/android.view.View[1]",
+      "关闭优惠券": "//*[@resource-id=\"app\"]/android.view.View[1]/android.view.View[1]/android.view.View[1]/android.view.View[2]",
+
+      "权限说明": "//*[@resource-id=\"android:id/content\"]/android.widget.LinearLayout[1]/android.widget.LinearLayout[1]",
+      "同意权限": "确定",
+      "取消权限": "取消"
+    },
+    "phone_login_page": {
+      "登录界面": "//android.widget.FrameLayout[1]",
+      "Log In 按钮": "com.xingin.xhs:id/c9h",
+      "输入框（手机号）": "com.xingin.xhs:id/c9i",
+      "政策条款（必须）": "com.xingin.xhs:id/dcj",
+      "登录按钮": "com.xingin.xhs:id/c89",
+      "输入框（验证码）": "com.xingin.xhs:id/a46"
+    },
+    "password_login_page": {
+      "登录界面": "//android.widget.FrameLayout[1]",
+      "Log In 按钮": "com.xingin.xhs:id/c9h",
+      "切换密码登录按钮": "com.xingin.xhs:id/e8_",
+      "输入框（手机号）": "com.xingin.xhs:id/c9i",
+      "输入框（密码）": "com.xingin.xhs:id/c_5",
+      "政策条款（必须）": "com.xingin.xhs:id/dcj",
+      "登录按钮": "com.xingin.xhs:id/c9k"
+    },
+    "search_page": {
+      "首页": "com.xingin.xhs:id/ave",
+      "首页搜索按钮": "com.xingin.xhs:id/dwa",
+      "搜索页面": "com.xingin.xhs:id/ehs",
+      "搜索按钮": "com.xingin.xhs:id/ce8",
+      "账号信息页": "com.xingin.xhs:id/dga",
+
+      "输入框(输入账号信息)": "com.xingin.xhs:id/ce3",
+      "输入框（有值后的）": "com.xingin.xhs:id/cdv",
+      "头像（用于进入直播间）": "com.xingin.xhs:id/c_h"
+    },
+    "live_broadcast_page": {
+      "关闭按钮": "com.xingin.xhs.alpha_live:id/closeView",
+
+      "输入框（评论）": "说点什么...",
+      "按钮（发送评论）": "com.xingin.xhs.alpha_live:id/sendMsgBtn"
+    }
   }
 }

@@ -2,6 +2,10 @@ import uiautomator2 as u2
 d = u2.connect("emulator-5554")
 
 # 小红书评论
-d(resourceId="com.xingin.xhs:id/eoo").click()
-d.send_keys("Hello", clear=True)
-d(resourceId="com.xingin.xhs:id/gfm").click()
+# d(text="说点什么…").click()
+# d(text="说点什么...").click()
+# d(focused=True).set_text("1111")
+if d(resourceId="com.xingin.xhs.alpha_live:id/sendMsgBtn").exists:
+    print(1111)
+    d(resourceId="com.xingin.xhs.alpha_live:id/sendMsgBtn").click_exists()
+

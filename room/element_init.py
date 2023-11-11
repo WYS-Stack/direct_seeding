@@ -46,3 +46,10 @@ def element_get_text(d, elementId, use_xpath=False):
         return d.xpath(elementId).get_text()
     return d(resourceId=elementId).get_text()
 
+
+def element_description(d, eValue):
+    d(description=eValue)
+
+
+def element_click_text(d, eValue):
+    d(text=eValue).click()

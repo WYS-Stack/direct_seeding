@@ -32,7 +32,7 @@ class App_Program:
         self.url = application_package_name[self.app_name]["url"]
         self.package_name = application_package_name[self.app_name]["package_name"]
         # 下载状态
-        self.status_label = wx.StaticText(self.panel, label="", pos=((300, 40)))
+        self.status_label = wx.StaticText(self.panel, label="", pos=(300, 40))
         logger.info(f"----------当前序列号：{serial}--------------------")
 
     @retry(wait_fixed=1000, stop_max_attempt_number=3) # 错误等十秒，重试只三次
@@ -47,7 +47,7 @@ class App_Program:
         retry_count = 0  # 用于跟踪重试次数
         while retry_count < 3:
             try:
-                timeout = aiohttp.ClientTimeout(total=10)  # 设置超时时间为10秒
+                timeout = aiohttp.ClientTimeout(total=3)  # 设置超时时间为10秒
                 conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
                 async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
                     async with session.get(self.url, headers=self.headers) as response:
@@ -60,7 +60,7 @@ class App_Program:
                             download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
                             return version, download_url
             except Exception as e:
-                logger.error(traceback.print_exc())
+                # logger.error(traceback.print_exc())
                 retry_count += 1  # 增加重试次数
         return None, None  # 达到最大重试次数时返回 None, None 进行跳过
 
@@ -125,34 +125,33 @@ class App_Program:
         Application_program_status = subprocess.getoutput(cmd)
         version, download_url = await self.request_latest_download_info()
         logger.info(f"App最新版本：{version}")
-        # 应用程序存在时 比较版本
+        # 应用程序是否存在
         if Application_program_status:
-            if version and download_url:
-                # 已安装版本
-                local_version = await self.check_application_version()
-                if local_version:
-                    # 版本不一致
-                    difference = await self.compare_version(version, local_version)
-                    if difference >= 2:
-                        logger.info(f"App本地版本：{local_version}")
-                        uninstall_status = await self.uninstall_application_program()
-                        if uninstall_status == "Success":
-                            wx.CallAfter(self.update_status, "卸载成功")
-                        else:
-                            wx.CallAfter(self.update_status, "卸载失败")
-                        download_status = await self.start_download(version, download_url)
-                        if download_status:
-                            return await self.install_application_program(version)
-                        else:
-                            return False
+            # 已安装版本
+            local_version = await self.check_application_version()
+            if local_version:
+                if not version:
+                    logger.info("App最新版本和下载地址请求错误！（跳过）")
+                    return True
+                # 版本是否符合
+                difference = await self.compare_version(version, local_version)
+                if difference >= 2:
+                    logger.info(f"App本地版本：{local_version}")
+                    uninstall_status = await self.uninstall_application_program()
+                    if uninstall_status == "Success":
+                        wx.CallAfter(self.update_status, "卸载成功")
                     else:
-                        logger.info("App版本通过！")
-                        return True
+                        wx.CallAfter(self.update_status, "卸载失败")
+                    download_status = await self.start_download(version, download_url)
+                    if download_status:
+                        return await self.install_application_program(version)
+                    else:
+                        return False
                 else:
-                    logger.info("未检测到本地版本")
-                    return False
+                    logger.info("App版本通过！")
+                    return True
             else:
-                logger.info("App最新版本和下载地址请求错误！")
+                logger.info("未检测到本地版本")
                 return False
         # 应用程序不存在时 直接下载安装
         else:
@@ -187,9 +186,6 @@ class App_Program:
                             wx.CallAfter(self.update_progress, progress)
                 wx.CallAfter(self.update_status, "下载完成")
                 logger.info("App下载完成")
-            else:
-                wx.CallAfter(self.update_status, "下载失败")
-                logger.info("App下载失败")
 
     async def start_download(self, version, download_url):
         """
@@ -201,18 +197,15 @@ class App_Program:
         if not os.path.isfile(file_name):
             try:
                 logger.info(f"开始下载{file_name}")
+                wx.CallAfter(self.update_status, "开始下载")
                 # 下载进度条
-                self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40))
+                self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1))
                 self.download_file(download_url, file_name)
-                return True
             except Exception as e:
                 logger.info(traceback.format_exc())
-                wx.CallAfter(self.update_status, f"下载失败: {str(e)}")
+                wx.CallAfter(self.update_status, f"下载失败")
                 return False
-        else:
-            wx.CallAfter(self.update_status, "下载地址错误")
-            logger.info("App下载地址错误")
-            return False
+        return True
 
     def update_progress(self, progress):
         """

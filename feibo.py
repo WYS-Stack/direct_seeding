@@ -22,6 +22,7 @@ from app.application_program import App_Program
 from config.root_directory import ROOT_DIR
 from configframe.click_config_frame import ClickWindow
 from configframe.comment_config_frame import CommentWindow
+from room.xiaohongshu_room import XHSRoom
 
 
 class FeiboFrame(wx.Frame):
@@ -940,12 +941,6 @@ class FeiboFrame(wx.Frame):
         """
         wx.MessageBox(result, "提示")
 
-    async def enter_xiaohongshu_live_broadcast_room(self):
-        """
-        进入小红书直播间
-        """
-        pass
-
     async def application_program_main(self, device):
         """
         启动应用程序
@@ -1088,7 +1083,8 @@ class FeiboFrame(wx.Frame):
                 douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event)
                 await douyin.enter_live_broadcast_room()
             else:  # 小红书
-                await self.enter_xiaohongshu_live_broadcast_room()
+                xhs = XHSRoom(device, self.app_id, app, enter_live_broadcast_event)
+                await xhs.enter_live_broadcast_room()
             # 等待进入直播间
             if enter_live_broadcast_event.wait(timeout=3):
                 # 当只输入了点赞数量，没选择执行任务时
