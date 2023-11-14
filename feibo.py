@@ -56,6 +56,8 @@ class FeiboFrame(wx.Frame):
         self.click_Y = 750
         # 默认点击间隔
         self.click_T = 0.1
+        # 等待设备时间
+        self.device_timeout = 45
         # 历史记录面板
         self.history_popup = None
         # 历史记录文件
@@ -699,7 +701,7 @@ class FeiboFrame(wx.Frame):
         """
         异步监听模拟器是否已完全 "开启"（启动过程中需要）
         """
-        sleep_count = 0  # 休眠次数
+        start_time = time.time()
         while True:
             status = self.check_selected_device_status(selected_android_option_name)
             # 已启动
@@ -709,8 +711,7 @@ class FeiboFrame(wx.Frame):
                 break
             # 启动中、未启动
             elif status in ["unstarted", "starting"]:
-                if sleep_count <= 30:
-                    sleep_count += 1
+                if time.time() - start_time < self.device_timeout:
                     self.devices = self.client.devices()
                     self.devices_info[selected_android_option_name]["status"] = "starting"
                     await asyncio.sleep(0.5)
@@ -718,7 +719,7 @@ class FeiboFrame(wx.Frame):
                     # 启动超时
                     self.animation.Hide()
                     self.switch_on_button()
-                    wx.MessageBox('请重新启动模拟器', '警告', wx.YES_NO | wx.ICON_ERROR)
+                    # wx.MessageBox('请重新启动模拟器', '警告', wx.YES_NO | wx.ICON_ERROR)
                     break
             else:
                 self.animation.Show()
@@ -1026,19 +1027,18 @@ class FeiboFrame(wx.Frame):
             if task_status == "accept":
                 self.wait_device_start(selected_android_option_name)
 
-    def wait_device_full_start(self, device, selected_android_option_name, timeout=30):
+    def wait_device_full_start(self, device, selected_android_option_name):
         """
         等待模拟器完全启动
         :param selected_android_option_name: 当前模拟器名称
         :param device: 模拟器服务
-        :param timeout: 最大等待时间（秒）
         :return: 是否成功
         """
         self.devices_info[selected_android_option_name]["task_status"] = "reject"
         cmd = f'adb -s {device.serial} shell getprop sys.boot_completed'
         start_time = time.time()
 
-        while time.time() - start_time < timeout:
+        while time.time() - start_time < self.device_timeout:
             output = subprocess.getoutput(cmd)
             if output == "1":
                 logger.info("设备已完成启动")
@@ -1049,11 +1049,10 @@ class FeiboFrame(wx.Frame):
         logger.warning("设备启动超时")
         return False
 
-    def wait_device_start(self, selected_android_option_name, timeout=45):
+    def wait_device_start(self, selected_android_option_name):
         """
         启动并等待模拟器启动
         :param selected_android_option_name: 选中的安卓模拟器名称
-        :param timeout: 最大等待时间（秒）
         """
         choice = wx.MessageBox('是否启动', '安卓模拟器未启动', wx.YES_NO | wx.ICON_QUESTION)
         start_time = time.time()
@@ -1062,7 +1061,7 @@ class FeiboFrame(wx.Frame):
             # 启动
             self.start_device(None)
 
-            while time.time() - start_time < timeout:
+            while time.time() - start_time < self.device_timeout:
                 if self.devices_info.get(selected_android_option_name).get("server"):
                     break
                 logger.info("等待启动中...")
@@ -1221,7 +1220,7 @@ class FeiboFrame(wx.Frame):
                 click_date_end = datetime.now()
                 time_cooling = (round(click_time_total / click_batch_total)) - (
                             click_date_end - self.click_date_start).seconds
-                # time_cooling = 3
+                # time_cooling = 3 # 测试时间3秒
                 if time_cooling > 0:
                     # 等待time_cooling秒
                     is_running.clear()

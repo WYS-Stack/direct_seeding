@@ -17,7 +17,7 @@
 4. python -m uiautomator2 init # **启动**所有模拟器后执行
 
 # 运行
-```python
+```shell
 python feibo.py 
 ```
 
