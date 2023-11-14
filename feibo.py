@@ -357,7 +357,7 @@ class FeiboFrame(wx.Frame):
         离开焦点时
         """
         if self.history_popup:
-            self.history_popup.Destroy()
+            self.history_popup.Hide()
         self.on_text_enter(None)
 
     def on_key_down(self, event):
@@ -418,6 +418,9 @@ class FeiboFrame(wx.Frame):
         展示历史记录
         :param data: 展示数据
         """
+        if not data:  # 如果没有数据，则不创建或显示历史记录弹出窗
+            return
+
         # 存储历史记录选项的成员变量
         self.history_choices = data[:4]
         self.history_popup = wx.ListBox(self.panel, choices=self.history_choices, style=wx.LB_SINGLE)
@@ -570,7 +573,7 @@ class FeiboFrame(wx.Frame):
             self.history_list = self.history_json["douyin"]
         else:
             self.history_list = self.history_json["xiaohongshu"]
-        if self.history_popup:
+        if self.history_popup and self.history_popup.IsShown():
             self.history_popup.Destroy()
             self.show_history_popup(self.history_list)
 
