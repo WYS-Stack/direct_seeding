@@ -1,5 +1,6 @@
 import os
 import time
+import json
 import random
 import asyncio
 import functools
@@ -58,10 +59,9 @@ class FeiboFrame(wx.Frame):
         # 历史记录面板
         self.history_popup = None
         # 历史记录文件
-        history_filename = os.path.join(ROOT_DIR, 'config', 'history.txt')
-        self.history_filename = history_filename
+        self.history_filename = os.path.join(ROOT_DIR, 'config', 'history.json')
         # 历史记录
-        self.history_list = self.read_history(self.history_filename)
+        self.history_json = self.read_history(self.history_filename)
 
         # 检测设备连接
         self.check_device_connection()
@@ -278,10 +278,10 @@ class FeiboFrame(wx.Frame):
         读取历史记录
         :param filename: 历史记录文件名
         """
-        history = []
+        history = {}
         try:
-            with open(filename, 'r') as file:
-                history = file.read().splitlines()
+            with open(filename, 'r', encoding='utf-8') as file:
+                history = json.load(file)
         except FileNotFoundError:
             pass
         return history
@@ -290,8 +290,8 @@ class FeiboFrame(wx.Frame):
         """
         写入历史记录
         """
-        with open(self.history_filename, 'w') as file:
-            file.write('\n'.join(self.history_list))
+        with open(self.history_filename, 'w', encoding="utf-8") as file:
+            json.dump(self.history_json, file, ensure_ascii=False, indent=4)
 
     def on_text_change(self, event):
         """
@@ -357,7 +357,7 @@ class FeiboFrame(wx.Frame):
         离开焦点时
         """
         if self.history_popup:
-            self.history_popup.Hide()
+            self.history_popup.Destroy()
         self.on_text_enter(None)
 
     def on_key_down(self, event):
@@ -566,6 +566,13 @@ class FeiboFrame(wx.Frame):
         selected_index = self.application_program_choice.GetSelection()
         # 获取选中设备的名称
         self.Application_program_name = self.application_program_choice.GetString(selected_index)
+        if self.Application_program_name == "抖音":
+            self.history_list = self.history_json["douyin"]
+        else:
+            self.history_list = self.history_json["xiaohongshu"]
+        if self.history_popup:
+            self.history_popup.Destroy()
+            self.show_history_popup(self.history_list)
 
     def check_device_connection(self, max_retries=3):
         """
