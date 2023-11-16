@@ -15,15 +15,18 @@ from room.element_init import (
     element_send_keys,
     element_set_text,
     element_click,
-    element_get_text, element_description
+    element_get_text,
+    element_description,
+    element_click_textMatches
 )
 
 class DouYinRoom:
-    def __init__(self, device, app_id, app_server, enter_live_broadcast_event):
+    def __init__(self, device, app_id, app_server, enter_live_broadcast_event, popup_flag):
         self.device = device
         self.app_id = app_id
         self.app = app_server
         self.enter_live_broadcast_event = enter_live_broadcast_event
+        self.popup_flag = popup_flag
 
     async def enter_live_broadcast_room(self):
         """
@@ -39,7 +42,9 @@ class DouYinRoom:
         self.config_data = await self.read_config()
         # 检查是否已经在直播间
         if not element_exists(d, self.config_data["live_broadcast_page"]["关闭按钮"]):
-            await self.handle_popups(d)
+            if self.popup_flag:
+                logger.info("检测弹窗...")
+                await self.handle_popups(d)
             await self.enter_search_page(d)
             await self.enter_live_broadcast_page(d)
         else:
@@ -200,7 +205,12 @@ class DouYinRoom:
         elif element_click_exists(d, search_page["搜索页面2"]):
             logger.info("已点击搜索按钮")
             # 从手动搜索的结果中点击头像进入直播间
-            if d.xpath(search_page["账号头像"]).click_exists(timeout=1.5):
+            if (d.xpath(search_page["账号头像"]).click_exists(timeout=1.5) or
+                    d.xpath(search_page["账号头像2"]).click_exists(timeout=1.5) or
+                    d.xpath(search_page["直播主窗口"]).click_exists(timeout=1.5) or
+                    d.xpath(search_page["直播主窗口2"]).click_exists(timeout=1.5) or
+                    element_click_textMatches(d,search_page["账号头像3"])):
+                logger.info("已点击账号头像")
                 enter_status = self.wait_full_enter_live_broadcast(d)
                 if enter_status:
                     logger.info("成功进入直播间")
@@ -241,8 +251,14 @@ class DouYinRoom:
                 # 尝试重新进入
                 if d.xpath(search_page["直播主窗口"]).click_exists(timeout=0.5):
                     logger.info("检测到'点击搜索页面直播主窗口'进入")
+                elif d.xpath(search_page["直播主窗口2"]).click_exists(timeout=0.5):
+                    logger.info("检测到'点击搜索页面直播主窗口2'进入")
                 elif d.xpath(search_page["账号头像"]).click_exists(timeout=0.5):
                     logger.info("检测到'点击搜索页面账号头像'进入")
+                elif d.xpath(search_page["账号头像2"]).click_exists(timeout=0.5):
+                    logger.info("检测到'点击搜索页面账号头像2'进入")
+                elif element_click_textMatches(d, search_page["账号头像3"]):
+                    logger.info("检测到'点击搜索页面账号头像3'进入")
                 elif d(search_page["搜索页面3"]).click_exists(timeout=0.5):
                     logger.info("检测到'点击账号详情头像'进入")
                 else:

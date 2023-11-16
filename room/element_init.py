@@ -53,3 +53,8 @@ def element_description(d, eValue):
 
 def element_click_text(d, eValue):
     d(text=eValue).click()
+
+
+def element_click_textMatches(d, pattern):
+    # 使用正则表达式匹配元素并点击
+    d(textMatches=pattern).click()

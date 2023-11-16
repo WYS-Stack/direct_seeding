@@ -463,31 +463,24 @@ class FeiboFrame(wx.Frame):
     def stop_task(self):
         """
         停止任务
-            当线程存在并且处于活动状态时：
-            设置等待时间为True时，任务等待会被取消
-            设置停止标签为True时，会停止点赞/评论
-            恢复暂停标签为False，为True时会暂停到当前位置
         """
         selected_android_option_name = self.get_choice_android_device_name()
-        if self.devices_info[selected_android_option_name].get("current_task"):
-            thread = self.devices_info[selected_android_option_name]["current_task"]
-            wait_event = self.devices_info[selected_android_option_name]["wait_event"]
-            stop_flag = self.devices_info[selected_android_option_name]["stop_flag"]
-            pause_flag = self.devices_info[selected_android_option_name]["pause_flag"]
-            if thread is not None and thread.is_alive():
-                wait_event.set()
-                stop_flag.set()
-                pause_flag.clear()
+        device_info = self.devices_info[selected_android_option_name]
+        thread = device_info.get("current_task")
+        if thread is not None and thread.is_alive():
+            device_info["is_running"].clear()
 
     def on_close_x(self, evt):
         """
         关闭主控制面板窗口"x"控件
         :param evt: 当前窗口
         """
-        # self.stop_task()
+        self.stop_task()
         # 主窗口关闭时，子窗口也要关闭
-        if hasattr(self, "self.config_click_frame"):
+        if hasattr(self, "config_click_frame"):
             self.config_click_frame.Close()
+        if hasattr(self,"config_comment_frame"):
+            self.config_comment_frame.close()
         # 当有模拟器启动时
         if len(self.devices) > 0:
             # 为当前线程创建独享的事件循环，避免多线程间的事件循环干扰
@@ -921,27 +914,37 @@ class FeiboFrame(wx.Frame):
         打开点赞配置面板
         :param event:
         """
-        self.config_click_frame = ClickWindow(None)
-        self.config_click_frame.Bind(wx.EVT_CLOSE, self.on_close_click_config_frame)
-        self.config_click_frame.Show()
+        if not hasattr(self,"config_click_frame"):
+            self.config_click_frame = ClickWindow(None)
+            self.config_click_frame.Bind(wx.EVT_CLOSE, self.on_close_click_config_frame)
+            self.config_click_frame.Show()
 
-    @staticmethod
-    def open_comment_config(evt):
+    def open_comment_config(self, evt):
         """
         打开评论配置面板
         """
-        app = QApplication([])
-        ex = CommentWindow()
-        ex.show()
-        app.exec_()
+        if not hasattr(self,"config_comment_frame"):
+            app = QApplication([])
+            self.config_comment_frame = CommentWindow()
+            self.config_comment_frame.closeEvent = self.on_close_click_comment_frame
+            self.config_comment_frame.show()
+            app.exec_()
+
+    def on_close_click_comment_frame(self, event):
+        """
+        关闭评论配置窗口
+        """
+        self.config_comment_frame.close()
+        del self.config_comment_frame
 
     def on_close_click_config_frame(self, evt):
         """
-        关闭窗口
+        关闭点赞配置窗口
         :param evt: 当前窗口
         """
         # 获取并存储配置的值
         self.config_click_Tinfo = self.config_click_frame.on_get_values(None)
+        del self.config_click_frame
         # 将事件继续传递给下一个事件处理函数
         evt.Skip()
 
@@ -1089,7 +1092,13 @@ class FeiboFrame(wx.Frame):
             # 进入直播间事件
             enter_live_broadcast_event = threading.Event()
             if self.Application_program_name == "抖音":
-                douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event)
+                devices_info = self.devices_info[selected_android_option_name]
+                # 是否检查抖音弹窗
+                if devices_info.get("popup_flag"):
+                    devices_info["popup_flag"] = False
+                else:
+                    devices_info["popup_flag"] = True
+                douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event, devices_info["popup_flag"])
                 await douyin.enter_live_broadcast_room()
             else:  # 小红书
                 xhs = XHSRoom(device, self.app_id, app, enter_live_broadcast_event)
@@ -1225,7 +1234,6 @@ class FeiboFrame(wx.Frame):
                     # 等待time_cooling秒
                     is_running.clear()
                     is_running.wait(timeout=time_cooling)
-                    # 当取消按钮被点击，wait_event标记会为True，并取消上一步的等待，继续执行
                     if is_running.is_set():
                         is_running.set()  # 重置事件状态
                         break

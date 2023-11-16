@@ -31,6 +31,8 @@ class App_Program:
                                                "/download"}}
         self.url = application_package_name[self.app_name]["url"]
         self.package_name = application_package_name[self.app_name]["package_name"]
+        # 下载进度条
+        self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1))
         # 下载状态
         self.status_label = wx.StaticText(self.panel, label="", pos=(300, 40))
         logger.info(f"----------当前序列号：{serial}--------------------")
@@ -182,7 +184,7 @@ class App_Program:
                         downloaded_length += len(chunk)
                         if chunk:
                             file.write(chunk)
-                            progress = downloaded_length / total_length
+                            progress = (downloaded_length / total_length) * 100
                             wx.CallAfter(self.update_progress, progress)
                 wx.CallAfter(self.update_status, "下载完成")
                 logger.info("App下载完成")
@@ -198,8 +200,6 @@ class App_Program:
             try:
                 logger.info(f"开始下载{file_name}")
                 wx.CallAfter(self.update_status, "开始下载")
-                # 下载进度条
-                self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1))
                 self.download_file(download_url, file_name)
             except Exception as e:
                 logger.info(traceback.format_exc())
@@ -212,7 +212,7 @@ class App_Program:
         更新进度条
         :param progress: 进度条
         """
-        self.progress.SetValue(int(progress * 100))
+        self.progress.SetValue(int(progress))
 
     def update_status(self, status):
         self.status_label.SetLabel(status)

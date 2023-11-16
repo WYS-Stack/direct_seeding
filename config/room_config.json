@@ -35,7 +35,10 @@
       "搜索页面2": "com.ss.android.ugc.aweme:id/xkp",
       "搜索页面3": "com.ss.android.ugc.aweme:id/o2z",
       "账号头像": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.view.UIView[3]",
-      "直播主窗口": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[2]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.LynxFlattenUI[3]"
+      "账号头像2": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[1]/android.widget.LinearLayout[1]/android.widget.FrameLayout[1]/android.widget.LinearLayout[1]/android.widget.LinearLayout[1]/android.widget.FrameLayout[1]/android.widget.ImageView[1]",
+      "账号头像3": "直播中，.*?，按钮",
+      "直播主窗口": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[2]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.LynxFlattenUI[3]",
+      "直播主窗口2": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[2]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.LynxFlattenUI[2]"
     },
     "account_info_page": {
       "直播标识": "com.ss.android.ugc.aweme:id/k_8",
