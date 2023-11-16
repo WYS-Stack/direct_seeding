@@ -10,6 +10,7 @@ import aiohttp
 from lxml import html
 from retrying import retry
 
+from config.root_directory import applications
 from logger import logger
 
 
@@ -18,21 +19,11 @@ class App_Program:
         self.panel = panel
         self.serial = serial
         self.app_name = application_program_name
-
-        # 应用程序对应的来源地址和url
-        application_package_name = {"抖音": {
-                                        "package_name": "com.ss.android.ugc.aweme",
-                                        "url": "https://apkpure.com/cn/douyin/com.ss.android.ugc.aweme/download"
-                                               "#google_vignette"},
-                                    "小红书": {
-                                        "package_name": "com.xingin.xhs",
-                                        "url": "https://apkpure.com/cn/%E5%B0%8F%E7%BA%A2%E4%B9%A6-%E2%80%93-%E4%BD"
-                                               "%A0%E7%9A%84%E7%94%9F%E6%B4%BB%E6%8C%87%E5%8D%97/com.xingin.xhs"
-                                               "/download"}}
-        self.url = application_package_name[self.app_name]["url"]
-        self.package_name = application_package_name[self.app_name]["package_name"]
+        application = applications[self.app_name]
+        self.url = application["url"]
+        self.package_name = application["package_name"]
         # 下载进度条
-        self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1))
+        self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1)).Hide()
         # 下载状态
         self.status_label = wx.StaticText(self.panel, label="", pos=(300, 40))
         logger.info(f"----------当前序列号：{serial}--------------------")
@@ -180,6 +171,7 @@ class App_Program:
             if response.status_code == 200:
                 with open(file_name, 'wb') as file:
                     downloaded_length = 0
+                    self.progress.Show()
                     for chunk in response.iter_content(chunk_size=1024):
                         downloaded_length += len(chunk)
                         if chunk:
@@ -308,10 +300,10 @@ class App_Program:
 
         # 检查引用程序运行状态
         running_status = self.check_application_program_running_status()
+        start_cmd = f'adb -s {self.serial} shell am start -n {self.Activity_name}'
         if not running_status:
-            cmd = f'adb -s {self.serial} shell am start -n {self.Activity_name}'
             # logger.info(f"启动{self.app_name}APP：{cmd}")
-            start_application_program_status = subprocess.getoutput(cmd)
+            start_application_program_status = subprocess.getoutput(start_cmd)
 
             if start_application_program_status:
                 # 再次检查运行状态
@@ -327,7 +319,7 @@ class App_Program:
                 choice = wx.MessageBox('是否尝试重启', 'APP启动失败', wx.YES_NO | wx.ICON_QUESTION)
                 if choice == wx.YES:
                     logger.info("尝试重启APP中...")
-                    start_application_program_status = subprocess.getoutput(cmd)
+                    start_application_program_status = subprocess.getoutput(start_cmd)
                     if start_application_program_status:
                         logger.info("APP启动成功")
                         return True
@@ -335,6 +327,12 @@ class App_Program:
                         logger.info("APP启动失败！")
                         return False
         else:
+            # 获取所有运行的app，倒序排序，即最后一个为前台运行的app
+            cmd = f"adb -s {self.serial} shell dumpsys activity top | grep -E 'ACTIVITY'"
+            foreground_state = subprocess.getoutput(cmd).strip().split('\n')
+            # app是否在前台运行
+            if self.package_name not in foreground_state[-1]:
+                subprocess.getoutput(start_cmd)
             logger.info(f"{self.app_name}已启动！")
             return True
 

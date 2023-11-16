@@ -45,8 +45,9 @@ class DouYinRoom:
             if self.popup_flag:
                 logger.info("检测弹窗...")
                 await self.handle_popups(d)
-            await self.enter_search_page(d)
-            await self.enter_live_broadcast_page(d)
+            page = await self.enter_search_page(d)
+            if page:
+                await self.enter_live_broadcast_page(d)
         else:
             logger.info("已进入直播间")
             self.enter_live_broadcast_event.set()
@@ -75,8 +76,8 @@ class DouYinRoom:
         await DouYinRoom.process_popup(d, popup["弹窗1"], popup["关闭1"])
         await DouYinRoom.process_popup(d, popup["检测到更新（弹窗）"], popup["以后再说（按钮）"])
         await DouYinRoom.process_popup(d, popup["抖音想访问你的通讯录"], popup["拒绝访问通讯录"])
-        await DouYinRoom.process_popup(d, popup["弹窗4"], popup["关闭4"], use_xpath=True)
-        await DouYinRoom.process_popup(d, popup["弹窗5"], popup["关闭5"])
+        await DouYinRoom.process_popup(d, popup["个人信息保护指引"], popup["同意个人信息"])
+        await DouYinRoom.process_popup(d, popup["开启通知/地理位置"], popup["拒绝开启通知/地理位置"])
         await DouYinRoom.process_popup(d, popup["弹窗6"], popup["关闭6"], use_xpath=True)
         await DouYinRoom.process_popup(d, popup["抖音没有响应"], popup["等待响应"])
         if element_exists(d, popup["添加搜索到桌面"], use_xpath=True):
@@ -114,6 +115,7 @@ class DouYinRoom:
                 await self.enter_search_result_page(d)
             elif element_exists(d, search_page["搜索页面3"]):
                 await self.enter_account_info_page(d)
+            return True
         else:
             logger.info("未确定当前页面")
             if not hasattr(self, "force_flag"):
@@ -121,6 +123,7 @@ class DouYinRoom:
                 self.force_flag = True
                 await self.app.force_restart_application_program()
                 await self.enter_live_broadcast_room()
+            return False
 
     async def enter_home_page(self, d):
         """

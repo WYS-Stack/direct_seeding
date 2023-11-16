@@ -1087,37 +1087,38 @@ class FeiboFrame(wx.Frame):
         device = self.devices_info[selected_android_option_name]["server"]
         # 启动应用程序
         app = await self.application_program_main(device)
-        if app:
-            await asyncio.sleep(3)  # 给予app启动一定的加载时间
-            # 进入直播间事件
-            enter_live_broadcast_event = threading.Event()
-            if self.Application_program_name == "抖音":
-                devices_info = self.devices_info[selected_android_option_name]
-                # 是否检查抖音弹窗
-                if devices_info.get("popup_flag"):
-                    devices_info["popup_flag"] = False
-                else:
-                    devices_info["popup_flag"] = True
-                douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event, devices_info["popup_flag"])
-                await douyin.enter_live_broadcast_room()
-            else:  # 小红书
-                xhs = XHSRoom(device, self.app_id, app, enter_live_broadcast_event)
-                await xhs.enter_live_broadcast_room()
-            # 等待进入直播间
-            if enter_live_broadcast_event.wait(timeout=3):
-                # 当只输入了点赞数量，没选择执行任务时
-                if self.current_click_num:
-                    self.total_click_num -= 1
-                    self.devices_info[selected_android_option_name]["batch_value"] = 0
-                    self.start_task(self.click_simulator_control, device, selected_android_option_name)
-                if self.checked:
-                    self.click_date_start = datetime.now()
-                    self.devices_info[selected_android_option_name]["batch_value"] = 0
-                    self.start_task(self.click_task, device, selected_android_option_name)
-                if self.comment_checked:
-                    self.start_task(self.comment_control, device, selected_android_option_name)
+        if not app:
+            return
+        await asyncio.sleep(3)  # 给予app启动一定的加载时间
+        # 进入直播间事件
+        enter_live_broadcast_event = threading.Event()
+        if self.Application_program_name == "抖音":
+            devices_info = self.devices_info[selected_android_option_name]
+            # 是否检查抖音弹窗
+            if devices_info.get("popup_flag"):
+                devices_info["popup_flag"] = False
             else:
-                self.devices_info[selected_android_option_name]['task_status'] = 'accept'
+                devices_info["popup_flag"] = True
+            douyin = DouYinRoom(device, self.app_id, app, enter_live_broadcast_event, devices_info["popup_flag"])
+            await douyin.enter_live_broadcast_room()
+        else:  # 小红书
+            xhs = XHSRoom(device, self.app_id, app, enter_live_broadcast_event)
+            await xhs.enter_live_broadcast_room()
+        # 等待进入直播间
+        if enter_live_broadcast_event.wait(timeout=3):
+            # 当只输入了点赞数量，没选择执行任务时
+            if self.current_click_num:
+                self.total_click_num -= 1
+                self.devices_info[selected_android_option_name]["batch_value"] = 0
+                self.start_task(self.click_simulator_control, device, selected_android_option_name)
+            if self.checked:
+                self.click_date_start = datetime.now()
+                self.devices_info[selected_android_option_name]["batch_value"] = 0
+                self.start_task(self.click_task, device, selected_android_option_name)
+            if self.comment_checked:
+                self.start_task(self.comment_control, device, selected_android_option_name)
+        else:
+            self.devices_info[selected_android_option_name]['task_status'] = 'accept'
 
     def before_start_control(self, selected_android_option_name):
         """
