@@ -10,7 +10,7 @@ import aiohttp
 from lxml import html
 from retrying import retry
 
-from config.root_directory import applications
+from config.root_directory import ROOT_DIR, applications
 from logger import logger
 
 
@@ -23,7 +23,8 @@ class App_Program:
         self.url = application["url"]
         self.package_name = application["package_name"]
         # 下载进度条
-        self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1)).Hide()
+        self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1))
+        self.progress.Hide()
         # 下载状态
         self.status_label = wx.StaticText(self.panel, label="", pos=(300, 40))
         logger.info(f"----------当前序列号：{serial}--------------------")
@@ -50,12 +51,14 @@ class App_Program:
                             tree = html.fromstring(data)
                             version_element = tree.xpath('/html/body/div[3]/main/div[1]/div/span[3]/span')[0]
                             version = version_element.text_content()
-                            download_url = tree.xpath('/html/body/div[3]/main/div[7]/a[1]/@href')[0]
-                            return version, download_url
+                            download_url = tree.xpath('/html/body/div[3]/main/div[6]/a[1]/@href')[0]
+                            apk_size_element = tree.xpath('/html/body/div[3]/main/div[10]/div[2]/div/div[2]/div[1]/div[2]/span[2]')[0]
+                            apk_size = float(apk_size_element.text_content().split(" MB")[0]) * 1024 * 1024
+                            return version, download_url, apk_size
             except Exception as e:
-                # logger.error(traceback.print_exc())
+                logger.error(traceback.print_exc())
                 retry_count += 1  # 增加重试次数
-        return None, None  # 达到最大重试次数时返回 None, None 进行跳过
+        return None, None, None  # 达到最大重试次数时返回 None, None, None 进行跳过
 
     async def check_application_version(self, timeout=30):
         """
@@ -116,7 +119,7 @@ class App_Program:
         cmd = f'adb -s {self.serial} shell pm list packages | grep {self.package_name}'
         # logger.info(f"检查App是否存在：{cmd}")
         Application_program_status = subprocess.getoutput(cmd)
-        version, download_url = await self.request_latest_download_info()
+        version, download_url, apk_size = await self.request_latest_download_info()
         logger.info(f"App最新版本：{version}")
         # 应用程序是否存在
         if Application_program_status:
@@ -135,7 +138,7 @@ class App_Program:
                         wx.CallAfter(self.update_status, "卸载成功")
                     else:
                         wx.CallAfter(self.update_status, "卸载失败")
-                    download_status = await self.start_download(version, download_url)
+                    download_status = await self.start_download(version, download_url, apk_size)
                     if download_status:
                         return await self.install_application_program(version)
                     else:
@@ -151,7 +154,7 @@ class App_Program:
             logger.info("APP状态：不存在")
             logger.info(f"最新apk地址：{download_url}")
             if version and download_url:
-                download_status = await self.start_download(version, download_url)
+                download_status = await self.start_download(version, download_url, apk_size)
                 if download_status:
                     return await self.install_application_program(version)
                 else:
@@ -160,14 +163,15 @@ class App_Program:
                 logger.info("App最新版本和下载地址请求错误！")
                 return False
 
-    def download_file(self, url, file_name):
+    def download_file(self, url, file_name, apk_size):
         """
         下载apk
+        :param apk_size: 安装包地址
         :param url: 安装包下载地址
         :param file_name: 文件名
         """
         with requests.get(url, headers=self.headers, stream=True) as response:
-            total_length = int(response.headers.get('content-length'))
+            total_length = int(response.headers.get('content-length')) if response.headers.get('content-length') else apk_size
             if response.status_code == 200:
                 with open(file_name, 'wb') as file:
                     downloaded_length = 0
@@ -181,22 +185,32 @@ class App_Program:
                 wx.CallAfter(self.update_status, "下载完成")
                 logger.info("App下载完成")
 
-    async def start_download(self, version, download_url):
+    async def start_download(self, version, download_url, apk_size):
         """
         开始下载
+        :param apk_size: 安装包大小
         :param version: 版本号
         :param download_url: apk下载地址
         """
         file_name = f"{self.app_name}_{version}.apk"
-        if not os.path.isfile(file_name):
-            try:
-                logger.info(f"开始下载{file_name}")
-                wx.CallAfter(self.update_status, "开始下载")
-                self.download_file(download_url, file_name)
-            except Exception as e:
-                logger.info(traceback.format_exc())
-                wx.CallAfter(self.update_status, f"下载失败")
-                return False
+
+        if os.path.isfile(file_name):
+            # 获取文件大小
+            file_path = os.path.join(ROOT_DIR, file_name)
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+
+            # 判断文件大小是否一致 apk_size
+            if file_size < apk_size:
+                os.remove(file_path)
+
+        try:
+            logger.info(f"开始下载{file_name}")
+            wx.CallAfter(self.update_status, "开始下载")
+            self.download_file(download_url, file_name, apk_size)
+        except Exception as e:
+            logger.info(traceback.format_exc())
+            wx.CallAfter(self.update_status, f"下载失败")
+            return False
         return True
 
     def update_progress(self, progress):

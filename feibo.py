@@ -465,10 +465,11 @@ class FeiboFrame(wx.Frame):
         停止任务
         """
         selected_android_option_name = self.get_choice_android_device_name()
-        device_info = self.devices_info[selected_android_option_name]
-        thread = device_info.get("current_task")
-        if thread is not None and thread.is_alive():
-            device_info["is_running"].clear()
+        device_info = self.devices_info.get(selected_android_option_name)
+        if device_info:
+            thread = device_info.get("current_task")
+            if thread is not None and thread.is_alive():
+                device_info["is_running"].clear()
 
     def on_close_x(self, evt):
         """
