@@ -74,7 +74,7 @@ class DouYinRoom:
         """
         popup = self.config_data.get("popup", {})
         await DouYinRoom.process_popup(d, popup["弹窗1"], popup["关闭1"])
-        await DouYinRoom.process_popup(d, popup["检测到更新（弹窗）"], popup["以后再说（按钮）"])
+        await DouYinRoom.process_popup(d, popup["检测到更新"], popup["以后再说"])
         await DouYinRoom.process_popup(d, popup["抖音想访问你的通讯录"], popup["拒绝访问通讯录"])
         await DouYinRoom.process_popup(d, popup["个人信息保护指引"], popup["同意个人信息"])
         await DouYinRoom.process_popup(d, popup["开启通知/地理位置"], popup["拒绝开启通知/地理位置"])

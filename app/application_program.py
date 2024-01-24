@@ -1,3 +1,4 @@
+import re
 import time
 
 import requests
@@ -8,7 +9,6 @@ import subprocess
 import asyncio
 import aiohttp
 from lxml import html
-from retrying import retry
 
 from config.root_directory import ROOT_DIR, applications
 from logger import logger
@@ -19,9 +19,12 @@ class App_Program:
         self.panel = panel
         self.serial = serial
         self.app_name = application_program_name
+
         application = applications[self.app_name]
-        self.url = application["url"]
+        self.apk_id = application["apk_id"]
         self.package_name = application["package_name"]
+        self.url = application["url"]
+
         # 下载进度条
         self.progress = wx.Gauge(self.panel, range=100, pos=(220, 40), size=(69, -1))
         self.progress.Hide()
@@ -29,7 +32,6 @@ class App_Program:
         self.status_label = wx.StaticText(self.panel, label="", pos=(300, 40))
         logger.info(f"----------当前序列号：{serial}--------------------")
 
-    @retry(wait_fixed=1000, stop_max_attempt_number=3) # 错误等十秒，重试只三次
     async def request_latest_download_info(self):
         """
         请求最新的下载信息
@@ -38,26 +40,57 @@ class App_Program:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
                           "Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.69"
         }
-        retry_count = 0  # 用于跟踪重试次数
-        while retry_count < 3:
+        if self.apk_id == 1:
             try:
-                timeout = aiohttp.ClientTimeout(total=3)  # 设置超时时间为10秒
-                conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
-                async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
-                    async with session.get(self.url, headers=self.headers) as response:
-                        if response.status == 200:
-                            data = await response.text()
-                            # 使用lxml解析页面内容
-                            tree = html.fromstring(data)
-                            version_element = tree.xpath('/html/body/div[3]/main/div[1]/div/span[3]/span')[0]
-                            version = version_element.text_content()
-                            download_url = tree.xpath('/html/body/div[3]/main/div[6]/a[1]/@href')[0]
-                            apk_size_element = tree.xpath('/html/body/div[3]/main/div[10]/div[2]/div/div[2]/div[1]/div[2]/span[2]')[0]
-                            apk_size = float(apk_size_element.text_content().split(" MB")[0]) * 1024 * 1024
-                            return version, download_url, apk_size
-            except Exception as e:
-                logger.error(traceback.print_exc())
-                retry_count += 1  # 增加重试次数
+                # 发起GET请求但不允许自动重定向
+                response = requests.get(self.url, allow_redirects=False)
+
+                # 检查最终响应状态码
+                if response.status_code == 302:
+                    # 获取重定向地址（也就是下载地址）
+                    download_url = response.headers['Location']
+
+                    # 发起第二次GET请求，获取文件信息
+                    redirect_response = requests.head(url=download_url)
+
+                    # 获取Content-Length字段，即文件大小
+                    apk_size = int(redirect_response.headers.get('Content-Length', 0))
+
+                    # 使用正则表达式提取版本号中的数字部分
+                    match = re.search(r'_v\d+_(\d+)_', download_url)
+                    if match:
+                        version_number = match.group(1)
+
+                        # 拆解版本号为指定格式
+                        parts = [str(int(version_number[i:i + 2])) if version_number[i] == '0' or version_number[
+                            i + 1] == '0' else version_number[i:i + 2] for i in range(0, len(version_number), 2)]
+                        version = '.'.join(parts)
+
+                        return version, download_url, apk_size
+
+            except requests.exceptions.RequestException as e:
+                print(f"请求发生异常: {e}")
+        else:
+            retry_count = 0  # 用于跟踪重试次数
+            while retry_count < 3:
+                try:
+                    timeout = aiohttp.ClientTimeout(total=3)  # 设置超时时间为10秒
+                    conn = aiohttp.TCPConnector(limit_per_host=5)  # 设置每个主机的连接限制
+                    async with aiohttp.ClientSession(connector=conn, timeout=timeout) as session:
+                        async with session.get(self.url, headers=self.headers) as response:
+                            if response.status == 200:
+                                data = await response.text()
+                                # 使用lxml解析页面内容
+                                tree = html.fromstring(data)
+                                version_element = tree.xpath('/html/body/div[6]/div[2]/div[2]/div[2]/div[1]/dl/dd[5]')[0]
+                                version = version_element.text_content().strip()
+                                download_url = "https://ucdl.25pp.com/fs08/2024/01/24/6/1_c6f802c54a5277370058bf2f1d9dcbe8.apk?nrd=0&fname=%E5%B0%8F%E7%BA%A2%E4%B9%A6&productid=2011&packageid=401478330&pkg=com.xingin.xhs&vcode=8231519&yingid=wdj_web&pos=wdj_web%2Fdetail_normal_dl%2F0&appid=6233739&apprd=6233739&iconUrl=http%3A%2F%2Fandroid-artworks.25pp.com%2Ffs08%2F2024%2F01%2F24%2F10%2F2_ac246665a5cf148e731999a0900105e2_con.png&did=edc060592d927c64188d0139dbe6371a&md5=90b46568ab7abefc4552ec811bfff94e"
+                                apk_size_element = tree.xpath('/html/body/div[6]/div[2]/div[2]/div[2]/div[1]/dl/dd[1]')[0]
+                                apk_size = float(apk_size_element.text_content().strip().split("MB")[0]) * 1024 * 1024
+                                return version, download_url, apk_size
+                except Exception as e:
+                    logger.error(traceback.format_exc())
+                    retry_count += 1  # 增加重试次数
         return None, None, None  # 达到最大重试次数时返回 None, None, None 进行跳过
 
     async def check_application_version(self, timeout=30):
@@ -202,6 +235,11 @@ class App_Program:
             # 判断文件大小是否一致 apk_size
             if file_size < apk_size:
                 os.remove(file_path)
+            # 如果文件存在且大小一致 则使用本地安装包
+            elif file_size == apk_size:
+                return True
+            else:
+                pass
 
         try:
             logger.info(f"开始下载{file_name}")

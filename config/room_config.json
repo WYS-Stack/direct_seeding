@@ -3,19 +3,29 @@
     "popup": {
       "弹窗1": "com.ss.android.ugc.aweme:id/jh",
       "关闭1": "com.ss.android.ugc.aweme:id/close",
-      "检测到更新（弹窗）": "com.ss.android.ugc.aweme:id/rxd",
-      "以后再说（按钮）": "com.ss.android.ugc.aweme:id/k_y",
+
+      "检测到更新": "com.ss.android.ugc.aweme:id/sb5",
+      "检测到更新（备用特征1）": "com.ss.android.ugc.aweme:id/d4+",
+      "检测到更新（备用特征2）": "com.ss.android.ugc.aweme:id/v=u",
+      "检测到更新（备用特征3）": "com.ss.android.ugc.aweme:id/eol",
+      "以后再说": "com.ss.android.ugc.aweme:id/k9-",
+
       "抖音想访问你的通讯录": "com.ss.android.ugc.aweme:id/io4",
       "拒绝访问通讯录": "com.ss.android.ugc.aweme:id/q0",
+
       "个人信息保护指引": "com.ss.android.ugc.aweme:id/content_layout",
-      "同意个人信息": "com.ss.android.ugc.aweme:id/d05",
+      "同意个人信息": "com.ss.android.ugc.aweme:id/dix",
+
       "开启通知/地理位置": "com.android.permissioncontroller:id/content_container",
       "拒绝开启通知/地理位置": "com.android.permissioncontroller:id/permission_deny_button",
+
       "弹窗6": "//*[@resource-id=\"com.android.permissioncontroller:id/content_container\"]/android.widget.LinearLayout[1]",
       "关闭6": "com.android.permissioncontroller:id/permission_deny_button",
+
       "抖音没有响应": "android:id/topPanel",
       "等待响应": "android:id/aerr_wait",
       "关闭应用": "android:id/aerr_close",
+
       "添加搜索到桌面": "//*[@resource-id=\"android:id/content\"]/android.view.ViewGroup[1]/android.view.ViewGroup[1]/android.view.ViewGroup[1]/android.view.ViewGroup[1]",
       "关闭添加搜索弹窗": "关闭弹窗按钮"
     },
@@ -31,8 +41,7 @@
     "password_login_page": {
     },
     "search_page": {
-      "搜索页面1": "com.ss.android.ugc.aweme:id/j1+",
-      "搜索页面11": "com.ss.android.ugc.aweme:id/kcv",
+      "搜索页面1": "com.ss.android.ugc.aweme:id/j0w",
       "搜索页面2": "com.ss.android.ugc.aweme:id/xkp",
       "搜索页面3": "com.ss.android.ugc.aweme:id/o2z",
       "账号头像": "//*[@resource-id=\"com.ss.android.ugc.aweme:id/lxd\"]/android.widget.LinearLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/android.widget.FrameLayout[1]/com.lynx.tasm.behavior.ui.view.UIView[3]",
